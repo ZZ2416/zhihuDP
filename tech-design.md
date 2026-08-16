@@ -23,7 +23,7 @@
 ## 2. 总体架构与时序图
 
 ```
-前端 static/index.html（首页搜索 + 详情页，原生 HTML/JS）
+前端 internal/web/index.html（首页搜索 + 详情页，原生 HTML/JS，go:embed 内嵌）
   ↓ POST /api/ask {"stock":"..."} → SSE 事件流
 main.go —— HTTP 路由、SSE 写入、事件解析、合规过滤
   ↓ runner.Query（流式）
@@ -385,7 +385,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 ### HTTP 接口：GET /
 
-- 静态托管 `static/index.html`
+- 托管 `internal/web/index.html`（go:embed 内嵌）
 
 ## 5. 数据/缓存/配置变更
 
@@ -418,7 +418,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 1. **M0 骨架 + 数据客户端**：`go mod init`、`zhihu.go`、`stock.go`、`GET /api/resolve` 探针。验证：`curl "localhost:8080/api/resolve?q=茅台"` 返回东财结果
 2. **M1 情绪分析 + Agent**：`sentiment.go`（分类+强度分）、`agent.go`（2 工具）、命令行跑通「识别→情绪→分析文案」。验证：`go run . 茅台` 打印 SentimentResult + 三段文案；**5 只热门股各抽 10 条分类结果人工核对，明显错误 ≤2 条（业务验收 #8）**
-3. **M2 Web 层**：`main.go` SSE、`compliance.go`、`static/index.html` 两页（搜索页 + 详情页，`fetch`+`ReadableStream` 手写 SSE 解析）。验证：浏览器端到端流式展示
+3. **M2 Web 层**：`cmd/server` SSE、`internal/compliance`、`internal/web/index.html` 两页（搜索页 + 详情页，`fetch`+`ReadableStream` 手写 SSE 解析）。验证：浏览器端到端流式展示
 4. **M3 打磨**：`config.example.yaml` 模板、README、免责声明、错误收口、日志脱敏
 
 ## 7. 上线三板斧（demo 版）

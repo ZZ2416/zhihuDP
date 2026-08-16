@@ -116,9 +116,11 @@ func (c *Client) endpoint() string {
 	return base + "/api/v1/content/zhihu_search"
 }
 
+// truncate 按 rune 安全截断，避免切断 UTF-8 字符
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	r := []rune(s)
+	if len(r) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(r[:n]) + "..."
 }

@@ -57,22 +57,28 @@ func RunAnalysis(ctx context.Context, query string, deps Deps, sink func(types.E
 			continue // 工具事件已在工具闭包内通过 sink 直发
 		}
 		if mv.IsStreaming && mv.MessageStream != nil {
-			for {
-				chunk, err := mv.MessageStream.Recv()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					_ = sink(types.Event{Type: "error", Data: map[string]string{"message": err.Error()}})
-					break
-				}
-				if text := compliance.Filter(chunk.Content); text != "" {
-					if err := sink(types.Event{Type: "delta", Data: map[string]string{"text": text}}); err != nil {
-						return err
+			// 内层函数保证任何返回路径都执行 Close，避免 sink 出错时泄漏流
+			err := func() error {
+				for {
+					chunk, err := mv.MessageStream.Recv()
+					if errors.Is(err, io.EOF) {
+						return nil
+					}
+					if err != nil {
+						_ = sink(types.Event{Type: "error", Data: map[string]string{"message": err.Error()}})
+						return nil
+					}
+					if text := compliance.Filter(chunk.Content); text != "" {
+						if err := sink(types.Event{Type: "delta", Data: map[string]string{"text": text}}); err != nil {
+							return err
+						}
 					}
 				}
-			}
+			}()
 			mv.MessageStream.Close()
+			if err != nil {
+				return err
+			}
 		} else {
 			msg, err := mv.GetMessage()
 			if err != nil {

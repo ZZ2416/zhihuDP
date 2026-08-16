@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-08-16 · CR 修复（评审轮）
+
+**问题与修复**：
+- 🟡 `internal/agent`：流式分支中 `sink` 出错时 `return` 跳过 `MessageStream.Close()`（资源泄漏）→ 改为内层函数保证任何返回路径都 Close
+- 🟢 `internal/{stock,zhihu,sentiment}`：`truncate` 按字节截断可能切断 UTF-8 字符 → 改为 rune 安全截断
+- 🟢 `tech-design.md`：§2/§4/§6 残留 `static/index.html` 旧路径 → 更新为 `internal/web/index.html`
+
+**验证**：build / vet / test 全过。
+
+---
+
 ## 2026-08-16 · v0.3.0 项目结构重构（标准 cmd/internal 布局）
 
 **背景**：原实现为扁平布局（9 个 .go 全在根目录），评审认为不工整；本版升级为标准 Go 项目布局，代码与文档同步。
