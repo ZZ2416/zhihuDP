@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zhihuDP — 知乎股票情绪分析</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --border:#e4e7ec; --text:#1f2329; --sub:#86909c; --bull:#f5222d; --bear:#389e0d; --neutral:#86909c; --accent:#1664ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:880px; margin:0 auto; padding:24px 16px 80px; }
+  header { display:flex; align-items:baseline; gap:12px; margin-bottom:20px; }
+  header h1 { font-size:22px; }
+  header .tag { font-size:12px; color:var(--sub); }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:16px; }
+  .search { display:flex; gap:10px; }
+  .search input { flex:1; padding:10px 14px; font-size:15px; border:1px solid var(--border); border-radius:8px; outline:none; }
+  .search input:focus { border-color:var(--accent); }
+  .search button { padding:10px 24px; font-size:15px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; }
+  .search button:disabled { opacity:.5; cursor:not-allowed; }
+  .hint { margin-top:12px; font-size:13px; color:var(--sub); }
+  .stock-head { display:flex; align-items:baseline; gap:10px; }
+  .stock-head .name { font-size:20px; font-weight:600; }
+  .stock-head .code { color:var(--sub); font-size:14px; }
+  .stock-head .market { font-size:12px; background:#f0f2f5; padding:2px 8px; border-radius:4px; color:var(--sub); }
+  .section-title { font-size:15px; font-weight:600; margin-bottom:14px; }
+  .heat { display:flex; align-items:baseline; gap:8px; margin-bottom:16px; }
+  .heat .num { font-size:28px; font-weight:700; }
+  .heat .label { color:var(--sub); font-size:13px; }
+  .ratio-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .ratio-row .rlabel { width:56px; font-size:13px; }
+  .bar { flex:1; height:10px; background:#f0f2f5; border-radius:5px; overflow:hidden; }
+  .bar > div { height:100%; border-radius:5px; }
+  .ratio-row .rpct { width:48px; text-align:right; font-size:13px; color:var(--sub); }
+  .bull { background:var(--bull); } .bear { background:var(--bear); } .neutral { background:var(--neutral); }
+  .score-box { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  .score-num { font-size:34px; font-weight:700; line-height:1; }
+  .score-num.low { color:#8c8c8c; } .score-num.mid { color:#d4a017; } .score-num.high { color:#d4380d; }
+  .score-note { font-size:12px; color:var(--sub); max-width:420px; }
+  .items { margin-top:16px; }
+  .item { padding:12px 0; border-top:1px solid var(--border); }
+  .item a { font-size:14px; color:var(--accent); text-decoration:none; font-weight:500; }
+  .item a:hover { text-decoration:underline; }
+  .item .meta { margin-top:6px; font-size:12px; color:var(--sub); display:flex; gap:12px; }
+  .tag-sentiment { font-size:11px; padding:1px 8px; border-radius:10px; }
+  .tag-sentiment.bull { color:var(--bull); background:#fff1f0; }
+  .tag-sentiment.bear { color:var(--bear); background:#f6ffed; }
+  .tag-sentiment.neutral { color:var(--neutral); background:#f0f2f5; }
+  .degraded { background:#fffbe6; border:1px solid #ffe58f; color:#874d00; padding:12px 16px; border-radius:8px; font-size:13px; margin-top:12px; }
+  #analysis { white-space:pre-wrap; line-height:1.8; font-size:14px; min-height:40px; }
+  .blink { display:inline-block; width:8px; height:16px; background:var(--accent); animation:blink 1s infinite; vertical-align:middle; }
+  @keyframes blink { 50% { opacity:0; } }
+  .err { background:#fff1f0; border:1px solid #ffa39e; color:#cf1322; padding:12px 16px; border-radius:8px; font-size:13px; }
+  footer { margin-top:24px; text-align:center; font-size:12px; color:var(--sub); }
+  .hidden { display:none; }
+  .back { display:inline-block; margin-bottom:12px; font-size:13px; color:var(--accent); cursor:pointer; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>zhihuDP</h1>
+    <span class="tag">知乎股票情绪分析 · 仅展示信息，不构成投资建议</span>
+  </header>
+
+  <!-- 搜索视图 -->
+  <div id="view-search">
+    <div class="card">
+      <div class="search">
+        <input id="stock-input" placeholder="输入股票名称或代码，如：茅台 / 600519" onkeydown="if(event.key==='Enter')doSearch()">
+        <button id="search-btn" onclick="doSearch()">查询</button>
+      </div>
+      <div class="hint">数据来源：知乎公开讨论（实时检索）· 情绪数据由 AI 自动分类，仅供参考</div>
+    </div>
+  </div>
+
+  <!-- 详情视图 -->
+  <div id="view-detail" class="hidden">
+    <a class="back" href="#/" onclick="showSearch();return false;">← 返回查询</a>
+
+    <div class="card">
+      <div class="stock-head" id="stock-head"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">情绪面板</div>
+      <div id="sentiment-body"><span style="color:var(--sub)">正在分析…</span></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">AI 分析</div>
+      <div id="analysis"></div><span id="cursor" class="blink hidden"></span>
+    </div>
+
+    <div class="card hidden" id="error-box"></div>
+
+    <footer>
+      本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。据此操作，风险自担。<br>
+      参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。
+    </footer>
+  </div>
+
+  <!-- 搜索视图也有免责声明 -->
+  <div id="view-search-footer" style="margin-top:24px;text-align:center;font-size:12px;color:var(--sub);">
+    本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function showDetail() {
+  $('view-search').classList.add('hidden');
+  $('view-search-footer').classList.add('hidden');
+  $('view-detail').classList.remove('hidden');
+}
+function showSearch() {
+  $('view-detail').classList.add('hidden');
+  $('view-search').classList.remove('hidden');
+  $('view-search-footer').classList.remove('hidden');
+}
+
+// 情绪标签中文
+const sentiLabel = { bull:'看多', bear:'看空', neutral:'中性' };
+const scoreClass = n => n<=3?'low':(n<=7?'mid':'high');
+
+async function doSearch() {
+  const stock = $('stock-input').value.trim();
+  if (!stock) return;
+  const btn = $('search-btn');
+  btn.disabled = true;
+
+  // 重置详情区
+  $('stock-head').innerHTML = '';
+  $('sentiment-body').innerHTML = '<span style="color:var(--sub)">正在分析…</span>';
+  $('analysis').textContent = '';
+  $('error-box').classList.add('hidden');
+  $('cursor').classList.remove('hidden');
+  showDetail();
+
+  try {
+    const resp = await fetch('/api/ask', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({stock})
+    });
+    if (!resp.ok) {
+      const j = await resp.json().catch(()=>({}));
+      showError(j.error || ('HTTP ' + resp.status));
+      return;
+    }
+    await readSSE(resp, handleEvent);
+  } catch (e) {
+    showError('请求失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    $('cursor').classList.add('hidden');
+  }
+}
+
+// 手写 SSE 解析：fetch + ReadableStream
+async function readSSE(resp, handler) {
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, {stream:true});
+    let idx;
+    while ((idx = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      let event = null, data = '';
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += line.slice(5).trim();
+      }
+      if (event) handler(event, data);
+    }
+  }
+}
+
+function handleEvent(event, data) {
+  let d = {};
+  try { d = data ? JSON.parse(data) : {}; } catch (e) {}
+  switch (event) {
+    case 'stock':
+      $('stock-head').innerHTML =
+        '<span class="name">' + esc(d.name||'') + '</span>' +
+        '<span class="code">' + esc(d.code||'') + '</span>' +
+        '<span class="market">' + esc(d.market||'') + '</span>' +
+        '<span style="margin-left:auto;font-size:12px;color:var(--sub)">实时检索</span>';
+      break;
+    case 'sentiment':
+      renderSentiment(d);
+      break;
+    case 'delta':
+      $('analysis').textContent += d.text || '';
+      break;
+    case 'error':
+      showError(d.message || '发生错误');
+      break;
+    case 'done':
+      break;
+  }
+}
+
+function renderSentiment(s) {
+  if (!s) return;
+  let html = '';
+
+  // 降级
+  if (s.degraded) {
+    html += '<div class="degraded">' + esc(s.err_msg || '数据不足，已降级展示') + '</div>';
+  }
+
+  // 热度
+  html += '<div class="heat"><span class="num">' + (s.heat||0) + '</span><span class="label">条近期讨论</span>' +
+          '<span style="margin-left:auto;font-size:12px;color:var(--sub)">样本 ' + (s.sample||0) + ' 条</span></div>';
+
+  // 多空占比
+  const r = s.ratio || {};
+  const pct = x => Math.round((x||0)*100) + '%';
+  html += ratioRow('看多', 'bull', r.bull) + ratioRow('看空', 'bear', r.bear) + ratioRow('中性', 'neutral', r.neutral);
+
+  // 参考强度分
+  if (s.score != null) {
+    html += '<div class="score-box">' +
+      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--sub)">/10</small></span>' +
+      '<span class="score-note">参考强度：反映当前讨论情绪与数据的充分程度，不代表涨跌预测。</span></div>';
+  }
+
+  // 代表观点
+  const items = s.items || [];
+  if (items.length) {
+    html += '<div class="section-title" style="margin-top:16px">代表观点</div><div class="items">';
+    for (const it of items) {
+      html += '<div class="item">' +
+        '<a href="' + esc(it.url||'#') + '" target="_blank" rel="noopener">' + esc(it.title||'(无标题)') + '</a>' +
+        '<span class="tag-sentiment ' + esc(it.sentiment||'neutral') + '">' + esc(sentiLabel[it.sentiment]||'中性') + '</span>' +
+        '<div class="meta"><span>' + esc(it.author||'匿名') + '</span><span>赞同 ' + (it.vote_up||0) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--sub);margin-top:4px">' + esc((it.excerpt||'').slice(0,80)) + '</div>' +
+        '</div>';
+    }
+    html += '</div>';
+  }
+
+  $('sentiment-body').innerHTML = html;
+}
+
+function ratioRow(label, cls, val) {
+  const p = Math.round((val||0)*100);
+  return '<div class="ratio-row"><span class="rlabel">' + label + '</span>' +
+    '<div class="bar"><div class="' + cls + '" style="width:' + p + '%"></div></div>' +
+    '<span class="rpct">' + p + '%</span></div>';
+}
+
+function showError(msg) {
+  const box = $('error-box');
+  box.classList.remove('hidden');
+  box.innerHTML = '<strong>出错了：</strong>' + esc(msg);
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
