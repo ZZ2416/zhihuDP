@@ -4,15 +4,15 @@ const scoreClass = n => n <= 3 ? 'low' : (n <= 7 ? 'mid' : 'high');
 
 /* ---- 报价卡 ---- */
 function renderQuote(q) {
+  const lvl = chgLevel(q.change_pct);
   const up = (q.change || 0) >= 0;
-  const color = up ? 'var(--bull)' : 'var(--bear)';
   const sign = up ? '+' : '';
   const vol = (q.volume || 0) >= 10000 ? (q.volume / 10000).toFixed(2) + '万手' : (q.volume || 0) + '手';
   $('quote-body').innerHTML =
     '<div class="q-row">' +
       '<div>' +
-        '<span class="q-price" style="color:' + color + '">' + (q.price || 0).toFixed(2) + '</span>' +
-        '<span class="q-change" style="color:' + color + '">' + sign + (q.change || 0).toFixed(2) + '  ' + sign + (q.change_pct || 0).toFixed(2) + '%</span>' +
+        '<span class="q-price ' + lvl + '">' + (q.price || 0).toFixed(2) + '</span>' +
+        '<span class="q-change ' + lvl + '">' + sign + (q.change || 0).toFixed(2) + '  ' + sign + (q.change_pct || 0).toFixed(2) + '%</span>' +
       '</div>' +
       '<div class="q-grid">' +
         qCell('今开', (q.open || 0).toFixed(2)) +
@@ -105,11 +105,12 @@ function renderHotSectors(items) {
   if (!items || !items.length) { $('hot-sectors-card').classList.add('hidden'); return; }
   let html = '';
   for (const it of items) {
-    const up = (it.change_pct || 0) >= 0;
+    const lvl = chgLevel(it.change_pct);
+    const up = lvl !== 'down';
     const n = String(it.name || '').replace(/'/g, '');
     html += '<span class="hot-chip" onclick="hotSectorClick(\'' + esc(it.code) + '\',\'' + esc(n) + '\')" title="查看板块成分股">' +
       '<span class="hn">' + esc(it.name) + '</span>' +
-      '<span class="hp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
+      '<span class="hp ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
   }
   el.innerHTML = html;
   $('hot-sectors-card').classList.remove('hidden');
@@ -121,12 +122,13 @@ function renderHotStocks(items) {
   if (!items || !items.length) { $('hot-stocks-card').classList.add('hidden'); return; }
   let html = '';
   for (const it of items) {
-    const up = (it.change_pct || 0) >= 0;
+    const lvl = chgLevel(it.change_pct);
+    const up = lvl !== 'down';
     html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
       '<span class="sn">' + esc(it.name) + '</span>' +
       '<span class="sc">' + esc(it.code) + '</span>' +
       '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +
-      '<span class="spct ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '<span class="spct ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
       '</div>';
   }
   el.innerHTML = html;
@@ -139,13 +141,14 @@ function renderTicker(items) {
   if (!items || !items.length) { el.innerHTML = ''; return; }
   let group = '';
   for (const it of items) {
-    const up = (it.change_pct || 0) >= 0;
+    const lvl = chgLevel(it.change_pct);
+    const up = lvl !== 'down';
     const n = String(it.name || '').replace(/'/g, '');
     group += '<span class="ticker-item" onclick="hotSearch(\'' + esc(n) + '\')">' +
       '<span class="tn">' + esc(it.name) + '</span>' +
       '<span class="row2">' +
         '<span class="tp">' + (it.price || 0).toFixed(2) + '</span>' +
-        '<span class="td ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+        '<span class="td ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
       '</span>' +
       '</span>';
   }

@@ -129,14 +129,15 @@ function klineHover(e, lock) {
   const prevClose = idx > 0 ? k.candles[idx - 1].close : (k.quote ? k.quote.prev_close : c.open);
   const chg = c.close - prevClose;
   const chgPct = prevClose ? (chg / prevClose * 100) : 0;
-  const up = chg >= 0;
+  const lvl = chgLevel(chgPct);
+  const up = lvl !== 'down';
   const vol = c.volume >= 10000 ? (c.volume / 10000).toFixed(2) + '万手' : c.volume + '手';
   k.tip.innerHTML =
     '<div class="d">' + esc(c.date) + '</div>' +
     '<div class="row"><span>开 <b>' + c.open.toFixed(2) + '</b></span><span>收 <b>' + c.close.toFixed(2) + '</b></span></div>' +
     '<div class="row"><span>高 <b>' + c.high.toFixed(2) + '</b></span><span>低 <b>' + c.low.toFixed(2) + '</b></span></div>' +
     '<div class="row"><span>量 <b>' + vol + '</b></span>' +
-    '<span class="' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + chg.toFixed(2) + ' (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</span></div>';
+    '<span class="' + lvl + '">' + (up ? '+' : '') + chg.toFixed(2) + ' (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</span></div>';
 
   // 浮层定位（CSS 像素，防溢出）
   const cssX = (e.clientX - rect.left);
