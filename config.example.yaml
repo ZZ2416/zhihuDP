@@ -1,0 +1,12 @@
+# zhihuDP 配置文件模板
+# 使用：复制本文件为 config.yaml，填入你自己的密钥，然后 go run .
+zhihu:
+  access_secret: ""                    # 必填：知乎开放平台 Access Secret（developer.zhihu.com/profile 获取）
+  openapi_base_url: "https://developer.zhihu.com"
+  zhihu_search_url: ""                 # 可选：完整 endpoint，优先级最高；留空用默认
+deepseek:
+  api_key: ""                          # 必填：DeepSeek API Key
+  base_url: "https://api.deepseek.com"
+  timeout: 120s                        # AI 调用超时
+server:
+  port: 8080                           # 访问 http://localhost:8080
