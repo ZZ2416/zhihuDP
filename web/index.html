@@ -3,22 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>zhihuDP · 知乎股票情绪分析</title>
+<title>知乎大盘 · 知乎股票情绪分析</title>
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
 <header>
   <div class="logo">
-    <svg class="whale" viewBox="0 0 64 48" aria-hidden="true">
-      <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
-      <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
-      <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
-      <circle cx="34" cy="18" r="2.6" fill="#fff"/>
-      <path d="M30 25 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
-    </svg>
-    <span>zhihuDP</span>
+    <img class="logo-whale" src="/pic/kanshan.jpg" alt="看山">
+    <span>知乎大盘</span>
   </div>
   <div class="header-right">
     <span class="tag">知乎股票情绪分析 · 信息工具</span>
@@ -28,33 +23,40 @@
 
 <main class="wrap">
 
-  <!-- 搜索视图 -->
-  <section id="view-search" class="view">
-    <div class="hero">
-      <svg class="big-whale" viewBox="0 0 64 48" aria-hidden="true">
-        <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
-        <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
-        <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
-        <path d="M34 18 c2.5-1 5-1.5 7.5-1.5" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-        <circle cx="27" cy="17" r="2.6" fill="#fff"/>
-        <path d="M23 24 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-        <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
-      </svg>
-      <h2>看看知乎上大家在聊什么</h2>
-      <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
-    </div>
-    <div class="card search-card">
-      <div class="search">
-        <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
-        <button id="search-btn" onclick="doSearch()">查询</button>
-      </div>
-      <div id="suggest" class="suggest hidden"></div>
-      <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
-    </div>
-  </section>
+  <!-- 终端行情条（ticker，首页加载热门股票） -->
+  <div class="ticker-title">热门行情</div>
+  <div class="ticker-bar" id="ticker-bar"></div>
 
-  <!-- 详情视图 -->
-  <section id="view-detail" class="view hidden">
+  <div class="workspace">
+
+    <!-- 主列 -->
+    <div class="main-col">
+
+      <!-- 搜索视图 -->
+      <section id="view-search" class="view">
+        <div class="hero">
+          <img class="mascot" src="/pic/kanshan.jpg" alt="看山" title="看山">
+          <h2>看看知乎上大家在聊什么</h2>
+          <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
+        </div>
+        <div class="card search-card">
+          <div class="search">
+            <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
+            <button id="search-btn" onclick="doSearch()">查询</button>
+          </div>
+          <div id="suggest" class="suggest hidden"></div>
+          <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
+        </div>
+
+        <!-- 股票讨论（知识库搜索，方形卡片） -->
+        <div class="card hot-card hidden" id="knowledge-card">
+          <div class="section-title">股票讨论</div>
+          <div class="knowledge-grid" id="knowledge"></div>
+        </div>
+      </section>
+
+      <!-- 详情视图 -->
+      <section id="view-detail" class="view hidden">
     <a class="back" onclick="showSearch()">← 返回查询</a>
 
     <div class="card">
@@ -85,6 +87,23 @@
     <div id="error-box" class="card hidden"><div class="err-box"></div></div>
   </section>
 
+    </div><!-- /main-col -->
+
+    <!-- 侧边栏：知乎热榜导航（主数据源）+ 热门板块 -->
+    <aside class="side-col">
+      <div class="card hot-card hidden" id="hot-sectors-card">
+        <div class="section-title">热门板块</div>
+        <div class="hot-chips" id="hot-sectors"></div>
+      </div>
+      <div class="card hot-card hidden" id="hot-stocks-card">
+        <div class="section-title">热门股票<span id="hot-stocks-label" class="hot-label"></span>
+          <a id="hot-stocks-back" class="hot-back hidden" onclick="backToHot()">← 返回热门</a></div>
+        <div class="hot-stocks" id="hot-stocks"></div>
+      </div>
+    </aside>
+
+  </div><!-- /workspace -->
+
 </main>
 
 <footer>
@@ -99,6 +118,36 @@
   <p>参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。</p>
 </footer>
 
+<!-- 开屏动画（banner 看山图） -->
+<div id="splash" aria-hidden="true">
+  <img class="splash-img" src="/pic/kanshan-header.jpg" alt="看山">
+  <div class="splash-title">知 乎 大 盘</div>
+</div>
+
+<!-- 密钥配置弹窗：首次进入引导用户配置自己的 DeepSeek / 知乎密钥，可跳过用默认 -->
+<div id="key-modal-mask" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
+  <div id="key-modal">
+    <h3 id="key-modal-title">🔑 配置你的密钥</h3>
+    <div class="modal-desc">
+      填入你自己的 <b>DeepSeek API Key</b> 与 <b>知乎三方 API Key</b>，数据仅由你本机使用。
+      密钥在浏览器内用 <b>RSA 公钥加密</b> 后传输，服务端私钥解密，明文不落日志。
+      不填则点击「跳过」，使用内置默认密钥。
+    </div>
+    <label for="key-deepseek">DeepSeek API Key（可留空）</label>
+    <input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+    <label for="key-zhihu">知乎三方 API Key / Access Secret（可留空）</label>
+    <input id="key-zhihu" type="password" placeholder="access secret" autocomplete="off" spellcheck="false">
+    <div class="key-actions">
+      <button class="btn btn-skip" id="key-skip" onclick="skipKeys()">跳过，使用默认密钥</button>
+      <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>
+    </div>
+    <div class="modal-err" id="key-err"></div>
+    <div class="modal-sec">🔒 默认密钥经公私钥加密机制保护，不会明文下发到浏览器；本工具不收集、不上传任何密钥。</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
 <script src="/js/util.js"></script>
 <script src="/js/theme.js"></script>
 <script src="/js/markdown.js"></script>
@@ -107,5 +156,6 @@
 <script src="/js/kline.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/app.js"></script>
+<script src="/js/keys.js"></script>
 </body>
 </html>

@@ -13,3 +13,9 @@ config.yaml
 # IDE 本地配置（GoLand / IntelliJ）
 .idea/
 *.iml
+
+# 设计源文件（大文件不入库）
+*.obj
+*.c4d
+*.ai
+*.psd

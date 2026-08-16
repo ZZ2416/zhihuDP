@@ -98,3 +98,86 @@ function showError(msg) {
     '<div class="detail">' + esc(msg || '未知错误') + '</div>';
 }
 function hideError() { $('error-box').classList.add('hidden'); }
+
+/* ---- 热门板块（chip） ---- */
+function renderHotSectors(items) {
+  const el = $('hot-sectors');
+  if (!items || !items.length) { $('hot-sectors-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    const n = String(it.name || '').replace(/'/g, '');
+    html += '<span class="hot-chip" onclick="hotSectorClick(\'' + esc(it.code) + '\',\'' + esc(n) + '\')" title="查看板块成分股">' +
+      '<span class="hn">' + esc(it.name) + '</span>' +
+      '<span class="hp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
+  }
+  el.innerHTML = html;
+  $('hot-sectors-card').classList.remove('hidden');
+}
+
+/* ---- 热门股票（行，点击查询） ---- */
+function renderHotStocks(items) {
+  const el = $('hot-stocks');
+  if (!items || !items.length) { $('hot-stocks-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
+      '<span class="sn">' + esc(it.name) + '</span>' +
+      '<span class="sc">' + esc(it.code) + '</span>' +
+      '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +
+      '<span class="spct ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '</div>';
+  }
+  el.innerHTML = html;
+  $('hot-stocks-card').classList.remove('hidden');
+}
+
+/* ---- ticker 行情条 ---- */
+function renderTicker(items) {
+  const el = $('ticker-bar');
+  if (!items || !items.length) { el.innerHTML = ''; return; }
+  let group = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    const n = String(it.name || '').replace(/'/g, '');
+    group += '<span class="ticker-item" onclick="hotSearch(\'' + esc(n) + '\')">' +
+      '<span class="tn">' + esc(it.name) + '</span>' +
+      '<span class="row2">' +
+        '<span class="tp">' + (it.price || 0).toFixed(2) + '</span>' +
+        '<span class="td ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '</span>' +
+      '</span>';
+  }
+  // 双份内容实现无缝滚动
+  el.innerHTML = '<div class="ticker-track">' + group + group + '</div>';
+}
+
+/* ---- 热门辅助数据：友好降级 ---- */
+function showHotDegraded(type) {
+  const id = type === 'stock' ? 'hot-stocks' : 'hot-sectors';
+  const card = type === 'stock' ? 'hot-stocks-card' : 'hot-sectors-card';
+  $('hot-stocks-label') && ($('hot-stocks-label').textContent = '');
+  $('hot-stocks-back') && $('hot-stocks-back').classList.add('hidden');
+  $(id).innerHTML = '<div class="degraded" style="margin-top:8px">热门行情数据暂时不可用，请稍后重试。' +
+    '<a style="margin-left:8px;cursor:pointer" onclick="retryHot()">重试</a></div>';
+  $(card).classList.remove('hidden');
+}
+
+/* ---- 股票讨论（知识库搜索，方形卡片） ---- */
+function renderKnowledge(items) {
+  const el = $('knowledge');
+  if (!items || !items.length) { $('knowledge-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const title = it.doc_name || '知乎讨论';
+    const excerpt = (it.content && it.content[0]) ? it.content[0].slice(0, 120) : '';
+    html += '<div class="k-card">' +
+      '<div class="k-title"><a href="' + esc(it.origin_url || '#') + '" target="_blank" rel="noopener">' + esc(title) + '</a></div>' +
+      '<div class="k-excerpt">' + esc(excerpt) + '</div>' +
+      (it.origin_url ? '<a class="k-link" href="' + esc(it.origin_url) + '" target="_blank" rel="noopener">查看讨论 ↗</a>' : '') +
+      '</div>';
+  }
+  el.innerHTML = html;
+  $('knowledge-card').classList.remove('hidden');
+}

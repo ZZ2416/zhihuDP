@@ -136,3 +136,72 @@ $('stock-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { hideSuggest(); doSearch(); }
 });
 window.addEventListener('load', () => $('stock-input').focus());
+
+/* ---- 首页热门加载：知乎热榜（主）+ 股票/板块（辅助，失败友好降级） ---- */
+async function loadHomeHot() {
+  // 股票/板块（辅助数据，限流时友好降级 + 重试）
+  const stocks = await apiHot('stock', 10).catch(() => null);
+  const sectors = await apiHot('sector', 8).catch(() => null);
+  if (stocks && stocks.length) { renderTicker(stocks); renderHotStocks(stocks); }
+  else { renderTicker([]); showHotDegraded('stock'); }
+  if (sectors && sectors.length) { renderHotSectors(sectors); }
+  else { showHotDegraded('sector'); }
+}
+
+function retryHot() {
+  loadKnowledge();
+
+  const label = $('hot-stocks-label'), back = $('hot-stocks-back');
+  if (label) label.textContent = ''; if (back) back.classList.add('hidden');
+  loadHomeHot();
+}
+
+/* 点击热门股票 → 直接查询 */
+function hotSearch(name) {
+  $('stock-input').value = name;
+  hideSuggest();
+  doSearch();
+}
+
+/* 首页初始化：热门 + 输入框聚焦 */
+window.addEventListener('load', () => {
+  $('stock-input').focus();
+  loadHomeHot();
+  loadKnowledge();
+});
+
+/* ---- 板块点击 → 成分股（复用热门股票卡片） ---- */
+async function hotSectorClick(code, name) {
+  $('hot-stocks').innerHTML = '<span class="hot-loading">加载板块成分股…</span>';
+  $('hot-stocks-card').classList.remove('hidden');
+  const items = await apiHot('sector_stock', 10, code).catch(() => null);
+  if (items && items.length) {
+    renderHotStocks(items);
+    setHotContext(true, name);
+  } else {
+    $('hot-stocks').innerHTML = '<span class="hot-loading">板块成分加载失败，请稍后重试</span>';
+  }
+}
+
+function backToHot() {
+  setHotContext(false);
+  loadHomeHot(); // 重新加载热门榜
+}
+
+function setHotContext(isSector, name) {
+  const label = $('hot-stocks-label');
+  const back = $('hot-stocks-back');
+  if (isSector) {
+    label.textContent = ' · 板块成分：' + (name || '');
+    back.classList.remove('hidden');
+  } else {
+    label.textContent = '';
+    back.classList.add('hidden');
+  }
+}
+
+/* ---- 股票讨论（知识库搜索）加载 ---- */
+async function loadKnowledge() {
+  const items = await apiKnowledge('股票', 10).catch(() => null);
+  if (items && items.length) renderKnowledge(items);
+}

@@ -11,9 +11,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"zhihudp/internal/config"
+	"zhihudp/internal/types"
 )
 
 // SearchResponse 知乎 zhihu_search 响应（字段名以实际 JSON 为准，PascalCase）
@@ -36,9 +38,24 @@ type Item struct {
 	EditTime    int64  `json:"EditTime"`
 }
 
-// Client 知乎开放平台客户端
+// Client 知乎开放平台客户端（密钥支持热更新，线程安全）
 type Client struct {
+	mu  sync.RWMutex
 	cfg config.ZhihuConfig
+}
+
+// secret 线程安全读取 AccessSecret
+func (c *Client) secret() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.cfg.AccessSecret
+}
+
+// UpdateKeys 热更新知乎密钥（配置弹窗提交后调用）
+func (c *Client) UpdateKeys(accessSecret string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cfg.AccessSecret = accessSecret
 }
 
 // New 创建客户端
@@ -48,7 +65,7 @@ func New(cfg config.ZhihuConfig) *Client {
 
 // Search 调用 zhihu_search 开放接口
 func (c *Client) Search(ctx context.Context, query string, count int) (*SearchResponse, error) {
-	if c.cfg.AccessSecret == "" {
+	if c.secret() == "" {
 		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
 	}
 	if count < 1 {
@@ -67,7 +84,7 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 	q.Set("Query", query)
 	q.Set("Count", strconv.Itoa(count))
 	req.URL.RawQuery = q.Encode()
-	req.Header.Set("Authorization", "Bearer "+c.cfg.AccessSecret)
+	req.Header.Set("Authorization", "Bearer "+c.secret())
 	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -102,6 +119,88 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 		sr.Data.Items = []Item{}
 	}
 	return &sr, nil
+}
+
+// KnowledgeSearch 知识库搜索（RAG）：在指定知识库中检索内容片段
+func (c *Client) KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
+	if c.secret() == "" {
+		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
+	}
+	if query == "" {
+		return nil, errors.New("搜索问题不能为空")
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 10 {
+		limit = 10
+	}
+
+	base := strings.TrimRight(c.cfg.OpenAPIBaseURL, "/")
+	if base == "" {
+		base = "https://developer.zhihu.com"
+	}
+	body := map[string]any{
+		"Query":            query,
+		"KnowledgeBaseIDs": kbIDs,
+		"RecallScopes":     []string{"personal"},
+		"Limit":            limit,
+	}
+	payload, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/v1/knowledge/search", strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.secret())
+	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("调用 knowledge/search 失败: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取 knowledge/search 响应失败: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("knowledge/search 非 2xx: %d, body: %s", resp.StatusCode, truncate(string(data), 500))
+	}
+
+	var sr struct {
+		Code    int    `json:"Code"`
+		Message string `json:"Message"`
+		Data    struct {
+			Items []struct {
+				Content         []string `json:"Content"`
+				DocName         string   `json:"DocName"`
+				RecallContentID string   `json:"RecallContentID"`
+				OriginUrl       string   `json:"OriginUrl"`
+			} `json:"Items"`
+		} `json:"Data"`
+	}
+	if err := json.Unmarshal(data, &sr); err != nil {
+		return nil, fmt.Errorf("knowledge/search 解析失败: %w", err)
+	}
+	if sr.Code != 0 {
+		return nil, fmt.Errorf("knowledge/search Code=%d Message=%s", sr.Code, sr.Message)
+	}
+
+	items := make([]types.KnowledgeItem, 0, len(sr.Data.Items))
+	for _, it := range sr.Data.Items {
+		if it.DocName == "" && len(it.Content) == 0 {
+			continue
+		}
+		items = append(items, types.KnowledgeItem{
+			Content:   it.Content,
+			DocName:   it.DocName,
+			OriginUrl: it.OriginUrl,
+		})
+	}
+	return items, nil
 }
 
 // endpoint 端点解析优先级：完整 URL > BaseURL + 路径 > 默认

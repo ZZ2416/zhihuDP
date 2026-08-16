@@ -45,13 +45,24 @@ func (fakeNewsProvider) GetNews(_ context.Context, _ string, _ int) ([]types.New
 	return []types.NewsItem{{Title: "测试资讯", Url: "https://example.com", Date: "2026-08-14", Source: "东方财富"}}, nil
 }
 
+// fakeKeyService 密钥箱桩：返回固定公钥，记录解密结果
+type fakeKeyService struct{}
+
+func (fakeKeyService) PublicKeyPEM() string {
+	return "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
+}
+
+func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []byte(b64), nil }
+
+func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
-		"index.html":      {Data: []byte("<html>test</html>")},
-		"css/style.css":   {Data: []byte("body{}")},
-		"js/app.js":       {Data: []byte("// app")},
+		"index.html":    {Data: []byte("<html>test</html>")},
+		"css/style.css": {Data: []byte("body{}")},
+		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -136,4 +147,20 @@ func TestIndexHandler(t *testing.T) {
 	if rec.Body.String() != "<html>test</html>" {
 		t.Errorf("首页内容错误: %s", rec.Body.String())
 	}
+}
+
+type fakeHotProvider struct{}
+
+func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.HotItem, error) {
+	return []types.HotItem{{Code: "600519", Name: "贵州茅台", Price: 1341.99, ChangePct: -0.98, Type: typ}}, nil
+}
+
+func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
+	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
+}
+
+type fakeKnowledgeProvider struct{}
+
+func (fakeKnowledgeProvider) KnowledgeSearch(_ context.Context, _ string, _ []string, _ int) ([]types.KnowledgeItem, error) {
+	return []types.KnowledgeItem{{DocName: "测试讨论", OriginUrl: "https://www.zhihu.com/", Content: []string{"股票讨论内容"}}}, nil
 }

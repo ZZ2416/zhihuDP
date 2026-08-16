@@ -25,7 +25,8 @@ import (
 type Deps struct {
 	ResolveStock     func(ctx context.Context, query string) (*types.StockInfo, error)
 	AnalyzeSentiment func(ctx context.Context, code, name string) (*types.SentimentResult, error)
-	DeepSeek         config.DeepSeekConfig
+	// DeepSeek 配置 getter：每次调用取最新（支持密钥热更新）
+	DeepSeek func() config.DeepSeekConfig
 }
 
 // RunAnalysis 运行 agent，把事件分发到 sink（SSE 转发 / CLI 打印）
@@ -139,7 +140,7 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		return nil, fmt.Errorf("构建 analyze_sentiment 工具失败: %w", err)
 	}
 
-	cm, err := newDeepSeekModel(ctx, deps.DeepSeek)
+	cm, err := newDeepSeekModel(ctx, deps.DeepSeek())
 	if err != nil {
 		return nil, fmt.Errorf("构建 DeepSeek 模型失败: %w", err)
 	}

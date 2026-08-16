@@ -4,6 +4,176 @@
 > 起始日期：2026-08-16
 > 说明：与 git 提交一一对应；文档链与代码均记录于此。
 
+## 2026-08-16 · ui_premiu：开屏密钥配置（KeyBox，RSA 公私钥）
+
+**改回 banner 图用途**：`fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg` 不再作顶栏背景，改为**开屏动画**主视觉；顶栏恢复纯主题色 + 毛玻璃。
+
+**开屏 + 密钥配置弹窗**（首次进入 URL）：
+- 开屏：banner 图缩放/淡入动画 2s → 淡出移除
+- 弹窗：DeepSeek API Key + 知乎 Access Secret 输入框，「跳过」/「保存我的密钥」
+- 跳过 → 使用内置默认密钥（仅服务端 config.yaml，不下发）
+- 保存 → 浏览器内 **RSA-OAEP/SHA-256（Web Crypto）** 加密后提交，服务端私钥解密热更新，立即生效
+- localStorage 记忆选择，后续访问不再弹窗；开屏每次保留
+
+**密钥箱（KeyBox）**：
+- `internal/keybox`：每次启动生成 2048 位 RSA 密钥对；私钥仅内存不持久化，重启旧公钥失效防重放
+- 端点 `GET /api/config/pubkey`（下发公钥 PEM）、`POST /api/config/keys`（加密提交，字段空=跳过）
+- 热更新链路：`zhihu.Client.UpdateKeys`（读写锁）+ `agent.Deps.DeepSeek` 改 getter（每次取最新配置）
+
+**验证**：build/vet/test 全绿 ✅、openssl 公钥加密↔Go 私钥解密回路 ✅、非法密文 400 ✅、/api/ask 默认密钥分析正常 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：主栏目股票讨论方形卡片（knowledge_search）+ 热门股票移侧边栏
+
+**knowledge_search 打通（RAG 知识库）**：
+- 端点 `POST /api/v1/knowledge/search`，schema 由用户提供：`{Query, KnowledgeBaseIDs[], RecallScopes[], Limit}`
+- 知识库：「股票投资方法论」（ID 7520243014858214186，267 条内容，公开）
+- `zhihu.Client.KnowledgeSearch` + `GET /api/knowledge?q=股票&limit=` + `KnowledgeProvider` 接口
+
+**布局重构**：
+- **主栏目**：新增「**股票讨论**」方形卡片网格（DocName 标题 + 内容摘要 + 知乎原文链接，hover 上浮）
+- **侧边栏**：热门板块 + **热门股票**（从主栏目移入）
+
+**验证**：/api/knowledge 返回真实讨论（市场轮动/红利股/速胜...）✅、首页结构 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：顶栏看山 banner 背景
+
+用户提供 `pic/fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg`（800×400 横版）→ `web/pic/kanshan-header.jpg`：
+- 顶栏加高至 84px，banner 靠右显示（`auto 100%` 不裁切）
+- **主题协调**：左侧实底色（`--bg`）保证 logo/文字可读 + 中间 62% 渐隐过渡 + 右侧图，双主题自适应（`color-mix`）
+- 验证：banner 200 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：favicon/主题换用指定看山图
+
+用户提供 `pic/v2-57ef90e293e644e853853915059e8e22_r.jpg`（800×800 正方形单视角看山）：
+- 复制为 `web/pic/kanshan.jpg`，生成 favicon.png（64×64）+ apple-touch-icon.png（180×180）
+- 顶栏 logo / hero 引用切换为 `kanshan.jpg`（移除四视图裁剪的 v1）
+- 验证：资产 200 ✅、旧引用 0 残留 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：真实看山素材 + 改名「知乎大盘」
+
+**① favicon 重裁**：手写 PNG 解码器分析四视图 4 个视角的鲸鱼 bbox（发现原裁剪右侧多 27px 边距不居中）→ **紧裁**（bbox+6px），生成 4 个候选 `web/pic/views/kanshan-v1..v4.png`；favicon 默认用 v1（64×64）
+
+**② 页面全面用真实看山**（不用手绘）：
+- 顶栏 logo：手绘 SVG 鲸鱼 → **真实看山图**（kanshan-v1）
+- hero：手绘「看山看报表」场景 → **真实看山图**（160px 圆角卡）
+
+**③ 改名「知乎大盘」**：`<title>`、logo 文字、README 全部改为「知乎大盘」（GitHub 仓库 URL 与文件夹名 `zhihuDP` 保持真实值）
+
+**验证**：知乎大盘 ×2、真实素材引用 ✅、favicon/views 资产 200 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：ticker 重构 + 移除知乎热榜
+
+**ticker 重构**：
+- 底色改为**与页面背景一致**（`var(--bg)`），内容更醒目
+- 「热门行情」标题移到滚动条**上方**（替代原「● 热门」徽标）
+- **涨=红点位、跌=绿点位**（`--bull`/`--bear`，A股惯例）
+- 保留 72px 三层信息 + 自动滚动
+
+**移除知乎热榜**（「不需要了，不用过滤」）：
+- 前端：侧边栏知乎热榜卡片、renderZhihuHot、apiZhihuHot、loadHomeHot 调用全部删除
+- 后端：`/api/zhihu-hot`、`zhihu.Client.HotList`、`ZhihuHotProvider`、`types.ZhihuHotItem` 全部移除（含金融过滤）
+- 侧边栏仅剩「热门板块」
+
+**验证**：首页结构 ✅（ticker-title 在上、zhihu-hot 0 残留）、样式 ✅（var(--bg)/红涨绿跌）、zhihu-hot 404 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：ticker 优化（更高 + 更自然）
+
+**优化**：
+- 高度 56 → **72px**，三层信息：**名称 / 价格 / 涨跌幅**（竖排，更饱满）
+- 渐变更柔和（120° 角度 + 低透明度阴影）、「● 热门」徽标改毛玻璃药丸
+- 分隔线、hover 背景细化，滚动节奏自然
+
+**验证**：css/js 资产 200 ✅、数据回归 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：知乎热榜金融过滤
+
+**需求**：下掉知乎热榜中与金融无关的条目（热榜为全站热点，股票工具只关心金融相关）。
+
+**实现**：
+- 拉全量 30 条 → **金融关键词过滤**（标题+摘要命中保留：股票/A股/基金/银行/楼市/房价/财报/投资/上市/泡沫/花呗/公司/企业/经济/贸易... 共 47 词）→ 取前 N
+- 侧边栏标题改为「**知乎热榜 · 金融**」
+- 实测 30→5 条：旺旺(企业)、花呗(金融)、发钱催生(经济)、韩国楼市泡沫、西安老破小——无关的（朱镕基/电影/WTT/游戏）全部下掉
+
+**验证**：过滤后仅金融条目 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：双栏布局 + 大 ticker + favicon + 看山看报表场景
+
+**① 布局升级（对标「看山指数」双栏）**：`workspace` 网格（主列 + 300px 侧边栏，sticky）
+- 侧边栏：**知乎热榜导航**（主数据源）+ **热门板块**（<960px 收为单栏）
+
+**② ticker 放大醒目**：56px 高 + 主题色渐变条 + 「● 热门」徽标 + 白字加大 + 悬停暂停
+
+**③ favicon**：新增 `web/favicon.svg`（看山鲸鱼）+ `apple-touch-icon`（kanshan.png），浏览器标签页图标变看山
+
+**④ 看山看报表场景**：未找到现成图 → **手绘 SVG 场景**（看山 + K线报表 + 「咦，有热度！」气泡，明暗主题自适应）
+
+**验证**：favicon 200 ✅、全部静态资源 200 ✅、SSE 全链路（stock→sentiment→778 delta→done）✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：知乎热榜为主数据源 + 外部数据友好降级
+
+**策略调整**（对齐「主数据源是知乎」）：
+- **知乎热榜**（`hot_list` 接口，每 3h 更新）→ 首页新增「知乎热榜」面板（**主数据源**，可点击跳转知乎，10 条）
+- 腾讯热门股票/板块 → 定位为**辅助数据**：限流/失败时**前端友好降级**（显示「热门行情数据暂时不可用」+ 重试按钮，不再静默消失），不做复杂反限流对抗
+
+**新增**：
+- `zhihu.Client.HotList` + `GET /api/zhihu-hot?count=`（1-30，默认 10）+ `ZhihuHotProvider` 接口
+- 前端：`renderZhihuHot`（带序号，前三红标）+ `showHotDegraded`/`retryHot` 友好降级交互
+
+**验证**：知乎热榜 5 条真实数据 ✅、参数校验 400 ✅、腾讯辅助回归 200 ✅、SSE 全链路 ✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：两个待确认项落地
+
+**① 板块点击 → 成分股**：
+- `internal/hot` 新增 `GetSectorStocks`（腾讯 board_code=板块代码）
+- `/api/hot?type=sector_stock&code=pt01801712&count=`（HotProvider 接口扩展）
+- 前端：板块 chip 可点击 → 热门股票卡片切换为「板块成分 · XX」+ 「← 返回热门」
+
+**② ticker 自动滚动**：
+- CSS 无缝循环动画（双份内容 + `translateX(-50%)`）+ 悬停暂停 + `prefers-reduced-motion` 适配
+
+**数据源切换（实测驱动）**：东财 push2 再次被限流（全镜像 000）→ 热门数据改**腾讯源**（与 K线同源、稳定）：
+- 热门股票 = 成交额榜（腾讯无涨幅排序；成交额=市场活跃度，比涨幅榜更符合「热门」语义）
+- 热门板块 = `mktHs/rank?t=01/averatio`（板块涨幅榜）
+- 成分股 = `getBoardRankList?board_code={pt码}`（腾讯数值字段为字符串，已适配）
+
+**验证**：股票 6 条（兆易创新/亨通光电...）✅、板块（玻璃玻纤 4.31%）✅、成分股（中国巨石...）✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · ui_premiu：首页热门推荐 + 看山吉祥物主题
+
+**需求/设计**：`features/ui_premiu/SRS.md` + `SDD.md`
+
+**新增**：
+- `internal/hot`（dao 层）：东财涨幅榜（热门股票/行业板块，免登录）
+- `GET /api/hot?type=stock|sector&count=` + `HotProvider` 接口
+- 首页重构：**热门板块 chips**（6 个）+ **热门股票列表**（8 只，点击直达查询）+ **ticker 终端行情条**（可点击）
+- **看山吉祥物**：`pic/` 素材 → `web/pic/kanshan.png`（go:embed），首页 hero 展示
+- 终端风格交互（对标「看山指数」页）：ticker 滚动条 + 热门面板，**保留双主题与全部功能**
+- 热门数据为展示数据，不进 LLM（合规）
+
+**验证**：/api/hot 股票 5 条 + 板块 4 条 ✅、参数校验 400 ✅、首页新元素 4 处 ✅、素材 200 ✅、lint/test/JS 语法全绿 ✅
+
 ---
 
 ## 2026-08-16 · feature/news：相关资讯（辅助数据源）

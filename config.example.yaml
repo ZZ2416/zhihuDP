@@ -4,6 +4,7 @@ zhihu:
   access_secret: ""                    # 必填：知乎开放平台 Access Secret（developer.zhihu.com/profile 获取）
   openapi_base_url: "https://developer.zhihu.com"
   zhihu_search_url: ""                 # 可选：完整 endpoint，优先级最高；留空用默认
+  knowledge_base_id: "7520243014858214186"  # 可选：知识库搜索用（股票投资方法论库）
 deepseek:
   api_key: ""                          # 必填：DeepSeek API Key
   base_url: "https://api.deepseek.com"

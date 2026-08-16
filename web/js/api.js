@@ -25,3 +25,17 @@ async function apiAsk(stock) {
     body: JSON.stringify({ stock })
   });
 }
+
+async function apiHot(type, count, code) {
+  let u = '/api/hot?type=' + encodeURIComponent(type) + '&count=' + (count || 8);
+  if (code) u += '&code=' + encodeURIComponent(code);
+  const resp = await fetch(u);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+async function apiKnowledge(q, limit) {
+  const resp = await fetch('/api/knowledge?q=' + encodeURIComponent(q) + '&limit=' + (limit || 10));
+  if (!resp.ok) return null;
+  return resp.json();
+}
