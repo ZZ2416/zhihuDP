@@ -1,24 +1,27 @@
-# 首页热门推荐 + 看山主题 — 设计文档（SDD）
+# 首页热门推荐 + 看山吉祥物主题 — 软件设计文档（SDD）
 
-> 版本：v0.1 · 日期：2026-08-16 · 分支：`ui_premiu`
-> 依据：`features/ui_premiu/SRS.md`
+> 版本：v0.2 · 日期：2026-08-16 · 分支：`ui_premiu`
+> 依据：`features/ui_premiu/设计方案.md`（产品/UX 设计）、`features/ui_premiu/SRS.md`（需求）
 
-## 1. 分层归属
+---
+
+## 1. 概述
+
+为首页新增「热门板块 + 热门股票」推荐（ticker 行情条 + 面板卡片），并接入看山吉祥物素材。数据源为东财涨幅榜（免登录公开接口），**展示数据不进 LLM**（合规，与 K线/资讯同策略）。
+
+## 2. 总体架构（分层归属）
 
 ```
-internal/hot（dao 层，新增）—— 东财热门（股票/板块）客户端
+internal/hot（dao 层，新增）—— 东财热门客户端
 internal/server（handler_hot.go + HotProvider 接口）—— GET /api/hot
-web/pic/（素材）—— 看山 PNG（go:embed 内嵌）
-web/index.html / web/css/style.css / web/js/ —— 首页重构 + 终端风格
+web/pic/（素材）—— 看山 PNG/JPG（go:embed 内嵌）
+web/css/style.css —— ticker / 热门卡片 / 吉祥物样式
+web/js/{api,ui,app}.js —— apiHot / 渲染 / 首页加载与点击查询
 ```
 
-## 2. 数据流
-
+新增依赖注入链（`Server.New` 6 参）：
 ```
-首页加载 →（异步）GET /api/hot?type=stock&type=sector
-  → internal/hot → 东财 clist（免登录）→ JSON
-  → 前端渲染热门板块/股票卡片（失败静默隐藏）
-点击热门股票 → 复用现有 doSearch（输入框赋值 + 查询）
+cmd/server.main → hotProviderFunc(hot.GetHot) → server.HotProvider
 ```
 
 ## 3. 数据结构（internal/types 新增）
@@ -43,58 +46,85 @@ type HotItem struct {
 | type | string | 是 | stock / sector | 非法 → 400 |
 | count | int | 否 | 条数 | clamp [1,20]，默认 stock=8 / sector=6 |
 
-响应 200：`[HotItem, ...]`；失败 502。
+响应 200：`[HotItem, ...]`；失败 502（透传摘要）。
 
-## 5. 前端设计
+## 5. 时序图
 
-### 首页结构（重构后）
-
+```plantuml
+@startuml
+Browser -> server: 首页 load → GET /api/hot?type=stock / type=sector（并行）
+server -> internal/hot: GetHot(ctx, typ, count)
+internal/hot -> eastmoney: clist/get（免登录，浏览器 UA）
+eastmoney --> internal/hot: data.diff[]
+internal/hot --> server: []HotItem
+server --> Browser: 200 JSON ×2
+Browser -> Browser: renderTicker + renderHotStocks + renderHotSectors
+alt 用户点击热门股票
+    Browser -> Browser: 输入框赋值 + doSearch()（走原有 SSE 链路）
+end
+@enduml
 ```
-hero（看山吉祥物大图 + 标题 + 副题）
-search 卡片（不变）
-热门板块 卡片（6 个板块 chip：名称 + 涨幅，红涨绿跌）
-热门股票 卡片（8 行：名称 / 代码 / 最新价 / 涨幅；点击 → doSearch）
-ticker 滚动条（可选，顶部复用热门股票数据，CSS 动画横向滚动）
-```
 
-### 终端风格（保留双主题）
+## 6. 模块与方法说明
 
-- 顶部 **ticker**：热门股票横向滚动条（`overflow-x:auto` + 滚动动画，点击项也可查询）
-- 详情区**网格化**：行情卡 / 情绪面板 / AI 分析 双栏排列（`@media` 断点回退单栏）
-- 大字号排版：标题 `clamp(28px, 4vw, 48px)`，eyebrow 小标
-- 色板：**保持现有明暗双主题 CSS 变量**（不引入第三主题），仅布局与交互对齐终端页
-
-### 看山素材
-
-- 复制 `pic/刘看山3d+平面/刘看山四视图.png` → `web/pic/kanshan.png`（约 16KB）
-- `web/embed.go` 增加 `//go:embed pic`；hero 区展示（`border-radius` 圆角卡片 + 主题背景适配）
-
-## 6. 方法说明
-
-### internal/hot
+### internal/hot（dao 层）
 
 **`func GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error)`**
-- 边界：typ 非法 → 错误；count clamp；东财非 200/解析失败 → 明确错误；空结果 → 空数组
-- 实现：按 typ 选 fs 参数（stock 沪深A / sector 行业板块），f12→Code, f14→Name, f2→Price, f3→ChangePct
+- 边界：typ 非 stock/sector → 明确错误；count clamp [1,20]；东财非 200/解析失败 → 明确错误；空结果 → 空数组
+- 实现：按 typ 选 fs 参数（stock=沪深A股 / sector=行业板块 `m:90+t:2`）；字段映射 f12→Code、f14→Name、f2→Price、f3→ChangePct；请求带浏览器 UA（同 kline/news 模式）
 
 ### internal/server
 
-- `HotProvider` 接口 + `Server.New` 增参（…newsProvider, hotProvider, frontend）
-- `handleHot`：type 校验、count clamp、调 provider、200/400/502
+**`type HotProvider interface { GetHot(ctx, typ string, count int) ([]types.HotItem, error) }`**
+- 消费方定义；`cmd/server` 用 `hotProviderFunc` 适配器注入
+
+**`func (s *Server) handleHot(w, r)`**：type 校验（400）、count clamp、调 provider、200/400/502、结构化日志
+
+### cmd/server/main.go
+
+- `hotProviderFunc(hot.GetHot)` + 编译期断言 `_ server.HotProvider`
 
 ### 前端
 
-- `web/js/api.js`：`apiHot(type, count)`
-- `web/js/ui.js`：`renderHotStocks(items)` / `renderHotSectors(items)`（红涨绿跌 chip）
-- `web/js/app.js`：首页 `loadHomeHot()`（init 时并行拉 stock+sector）+ 点击热门股票 → 输入框赋值 + `doSearch()`
+| 文件 | 职责 |
+|---|---|
+| `web/js/api.js` | `apiHot(type, count)`（新增） |
+| `web/js/ui.js` | `renderTicker` / `renderHotStocks` / `renderHotSectors`（新增，红涨绿跌） |
+| `web/js/app.js` | `loadHomeHot()`（init 并行拉 stock+sector）+ `hotSearch(name)`（赋值+查询） |
+| `web/css/style.css` | `.ticker-bar/.ticker-item`、`.hot-chips/.hot-chip`、`.hot-stocks/.hot-stock`、`.mascot` |
+| `web/index.html` | ticker 条 + 热门板块/股票卡片（搜索视图内）+ hero 吉祥物 `<img>` |
+| `web/embed.go` | `//go:embed index.html css js pic`（新增 pic） |
 
-## 7. 上线三板斧
+## 7. 素材管线
 
-- 监控：`[hot] type=stock count=8 耗时=XXms`
-- 灰度：渐进增强（热门卡片失败即隐藏，搜索不受影响）
+- 源素材：`pic/看山三视图/`（JPG）、`pic/刘看山3d+平面/`（PNG）
+- 拷贝至 `web/pic/`：`kanshan.png`（四视图，hero 用）、`kanshan-hero.jpg`（备用）
+- `.gitignore` 排除大源文件（`*.obj *.c4d *.ai *.psd`），仓库只保留小图
+
+## 8. 边界处理
+
+| 场景 | 处理 |
+|---|---|
+| 热门接口失败 | 前端静默隐藏 ticker/卡片，搜索不受影响 |
+| 空结果 | 隐藏对应卡片 |
+| 板块点击 | 当前仅展示（成分股查询 P1 后置） |
+| 明暗主题 | 新组件全用 CSS 变量，自动适配 |
+
+## 9. 上线三板斧（demo）
+
+- 监控：`[hot] type=stock count=8 耗时=XXms` 结构化日志
+- 灰度：渐进增强（失败即隐藏），天然可回退
 - 回滚：独立接口与卡片，可单独下线
 
-## 8. 待确认
+## 10. 实现拆分（已实现 ✅）
 
-- [ ] 板块点击行为：查询板块内个股（需板块成分接口，P1 后置）还是仅展示？
-- [ ] ticker 是否要做点击查询（默认做）
+1. ✅ `internal/hot` + `/api/hot` + 接线
+2. ✅ 素材入 `web/pic` + embed
+3. ✅ 首页重构（ticker + 热门卡片 + hero 吉祥物）
+4. ✅ JS（apiHot / 渲染 / loadHomeHot / hotSearch）
+5. ⏳ 待确认：板块点击行为（成分股）、ticker 自动滚动动画
+
+## 11. 待确认
+
+- [ ] 板块 chip 点击 → 查询板块内个股（需板块成分接口，P1）还是保持仅展示？
+- [ ] ticker 是否加自动滚动动画（CSS marquee/JS requestAnimationFrame）？
