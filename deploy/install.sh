@@ -169,6 +169,9 @@ else
   info "复用已有私钥 ${PRIVATE_KEY}"
 fi
 
+# 5.1.5 媒体播放令牌（随机生成；也可设 MEDIA_TOKEN 指定）
+MEDIA_TOKEN="${MEDIA_TOKEN:-$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
+
 # 5.2 用公钥加密真实密钥 → 密文写入 config.yaml（明文只在脚本内存，不落盘）
 # 注意：私钥属主是 APP_USER，故以该用户运行 -enc 读取私钥
 encrypt_key() {
@@ -191,11 +194,16 @@ if [[ -n "$ZHIHU_ACCESS_SECRET" ]]; then ZHIHU_ENC="$(encrypt_key "$ZHIHU_ACCESS
   echo "  api_key_enc: \"${DEEPSEEK_ENC}\""
   echo "  base_url: \"https://api.deepseek.com\""
   echo "  timeout: 120s"
+  echo "media:"
+  echo "  dir: \"/opt/zhihudp/media\""
+  echo "  token: \"${MEDIA_TOKEN}\""
   echo "server:"
   echo "  port: ${APP_PORT}"
 } > "$CONFIG_PATH"
 chown "$APP_USER":"$APP_USER" "$CONFIG_PATH"
 chmod 600 "$CONFIG_PATH"
+mkdir -p /opt/zhihudp/media
+chown "$APP_USER":"$APP_USER" /opt/zhihudp/media
 info "config.yaml 已生成（仅密文，无明文；chmod 600）"
 
 # ---------- 6. systemd 服务 ----------

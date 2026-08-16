@@ -23,3 +23,7 @@ deepseek:
 
 server:
   port: 8080                          # 访问 http://localhost:8080
+
+media:
+  dir: ""                          # 演示视频目录；经 /media/player 播放（抖音式禁止转载）
+  token: ""                        # 播放令牌：发给想看的人，无/错 token 一律 403

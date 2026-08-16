@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -76,7 +78,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -243,5 +245,57 @@ func TestAskQuotaExceeded(t *testing.T) {
 	s.Routes().ServeHTTP(rec3, req3)
 	if rec3.Code != http.StatusForbidden {
 		t.Fatalf("超限应 403，实际 %d", rec3.Code)
+	}
+}
+
+func TestMediaTokenProtection(t *testing.T) {
+	// 构造带媒体目录/令牌的 server（临时目录放一个测试视频）
+	dir := t.TempDir()
+	video := filepath.Join(dir, "demo.mp4")
+	if err := os.WriteFile(video, []byte("fake-video-data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer()
+	s.mediaDir = dir
+	s.mediaToken = "secret-token"
+
+	// 无 token → 403
+	req := httptest.NewRequest(http.MethodGet, "/media/player?f=demo.mp4", nil)
+	rec := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("无 token 应 403，实际 %d", rec.Code)
+	}
+	// 错 token → 403
+	req = httptest.NewRequest(http.MethodGet, "/media/player?t=wrong&f=demo.mp4", nil)
+	rec = httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("错 token 应 403，实际 %d", rec.Code)
+	}
+	// 正确 token → 播放页 200 且含禁下载属性
+	req = httptest.NewRequest(http.MethodGet, "/media/player?t=secret-token&f=demo.mp4", nil)
+	rec = httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("正确 token 应 200，实际 %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "nodownload") || !strings.Contains(body, "oncontextmenu") {
+		t.Errorf("播放页应含禁下载/禁右键属性")
+	}
+	// 视频流正确 token → 200 内容一致
+	req = httptest.NewRequest(http.MethodGet, "/media/file?t=secret-token&f=demo.mp4", nil)
+	rec = httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "fake-video-data" {
+		t.Fatalf("视频流异常: %d %q", rec.Code, rec.Body.String())
+	}
+	// 路径穿越防护：f=../config.yaml 应被拒绝（base 化后不存在）
+	req = httptest.NewRequest(http.MethodGet, "/media/player?t=secret-token&f=..%2F..%2Fetc%2Fpasswd", nil)
+	rec = httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("路径穿越应 404，实际 %d", rec.Code)
 	}
 }

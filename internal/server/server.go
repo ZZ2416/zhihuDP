@@ -121,12 +121,13 @@ type Server struct {
 	keyService    KeyService
 	chatProvider  ChatProvider
 	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
-	mediaDir      string      // 媒体目录（/media/ 静态播放）；空 = 禁用
+	mediaDir      string      // 媒体目录（/media/ 播放）；空 = 禁用
+	mediaToken    string      // 媒体访问令牌；空/不匹配 → 403（防未授权访问与转发）
 	frontend      fs.FS       // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, mediaDir string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -138,6 +139,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		chatProvider:  chatProvider,
 		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		mediaDir:      mediaDir,
+		mediaToken:    mediaToken,
 		frontend:      frontend,
 	}
 }
@@ -155,9 +157,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/ask", s.handleAsk)                // SSE：完整分析
 	mux.HandleFunc("POST /api/chat", s.handleChat)              // SSE：二期看山追问对话
 	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)   // 二期：清空某股票会话
-	// 媒体静态目录：/media/* → 磁盘目录文件（演示视频等；支持 Range 断点播放）
-	if s.mediaDir != "" {
-		mux.Handle("GET /media/", http.StripPrefix("/media/", http.FileServer(http.Dir(s.mediaDir))))
+	// 媒体播放（抖音式禁止转载）：token 校验 + 受保护播放页 + 视频流（Range 支持）
+	if s.mediaDir != "" && s.mediaToken != "" {
+		mux.HandleFunc("GET /media/player", s.handleMediaPlayer) // 播放页（禁下载/右键）
+		mux.HandleFunc("GET /media/file", s.handleMediaFile)     // 视频流（token 校验）
 	}
 	// 首页：下发会话配额令牌 Cookie（每次打开页面 = 新会话 = 20 次 API 调用机会）
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

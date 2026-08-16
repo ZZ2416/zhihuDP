@@ -97,10 +97,11 @@ func main() {
 		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
 			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
 		}),
-		ks,            // 密钥箱：公钥下发 + 加密密钥热更新
-		chatSvc,       // 二期：看山追问对话
-		cfg.Media.Dir, // 媒体目录（/media/ 静态播放；空 = 禁用）
-		web.FS,        // 前端资源（go:embed 内嵌）
+		ks,              // 密钥箱：公钥下发 + 加密密钥热更新
+		chatSvc,         // 二期：看山追问对话
+		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
+		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
+		web.FS,          // 前端资源（go:embed 内嵌）
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
