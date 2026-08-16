@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -22,7 +23,7 @@ const (
 	boardURL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/mktHs/rank"   // 行业板块排行
 )
 
-// GetHot 获取热门榜（stock=热门股票 / sector=热门板块，按涨幅排序）
+// GetHot 获取热门榜（stock=热门股票 / sector=热门板块涨幅榜 / sector_fall=暴跌板块跌幅榜）
 func GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error) {
 	if count < 1 {
 		count = 1
@@ -34,9 +35,11 @@ func GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error)
 	case "stock":
 		return fetchRankList(ctx, "aStock", count, "stock")
 	case "sector":
-		return fetchSectorList(ctx, count)
+		return fetchSectorList(ctx, count, true)
+	case "sector_fall":
+		return fetchSectorList(ctx, count, false)
 	}
-	return nil, fmt.Errorf("不支持的 type: %s（仅 stock / sector）", typ)
+	return nil, fmt.Errorf("不支持的 type: %s（仅 stock / sector / sector_fall）", typ)
 }
 
 // GetSectorStocks 获取板块成分股（code=板块代码，如 pt01801712）
@@ -96,10 +99,33 @@ func fetchRankList(ctx context.Context, boardCode string, count int, typ string)
 	return items, nil
 }
 
-// fetchSectorList 腾讯行业板块排行（按涨幅降序）
-func fetchSectorList(ctx context.Context, count int) ([]types.HotItem, error) {
+// fetchSectorList 腾讯行业板块排行：一次拉取全量板块（l=200，实测约 124 个行业板块），
+// 本地按平均涨幅排序取前 count。
+//   - ascend=true  → 涨幅榜（热门板块，涨幅降序取前 count）
+//   - ascend=false → 暴跌板块（跌幅榜，涨幅升序即跌幅最大取前 count）
+//
+// 注：接口固定按涨幅降序返回，`direct`/`sort` 等排序参数实测无效，故采用本地排序。
+func fetchSectorList(ctx context.Context, count int, ascend bool) ([]types.HotItem, error) {
+	all, err := fetchAllSectors(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(all, func(i, j int) bool {
+		if ascend {
+			return all[i].ChangePct > all[j].ChangePct
+		}
+		return all[i].ChangePct < all[j].ChangePct
+	})
+	if len(all) > count {
+		all = all[:count]
+	}
+	return all, nil
+}
+
+// fetchAllSectors 拉取全量行业板块（腾讯 mktHs/rank）
+func fetchAllSectors(ctx context.Context) ([]types.HotItem, error) {
 	q := url.Values{}
-	q.Set("l", strconv.Itoa(count))
+	q.Set("l", "200") // 超过实际板块数，接口返回全量（实测 124 个行业板块）
 	q.Set("p", "1")
 	q.Set("t", "01/averatio")
 

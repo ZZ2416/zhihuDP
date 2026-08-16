@@ -137,15 +137,18 @@ $('stock-input').addEventListener('keydown', e => {
 });
 window.addEventListener('load', () => $('stock-input').focus());
 
-/* ---- 首页热门加载：知乎热榜（主）+ 股票/板块（辅助，失败友好降级） ---- */
+/* ---- 首页热门加载：知乎热榜（主）+ 股票/板块/暴跌（辅助，失败友好降级） ---- */
 async function loadHomeHot() {
   // 股票/板块（辅助数据，限流时友好降级 + 重试）
   const stocks = await apiHot('stock', 10).catch(() => null);
   const sectors = await apiHot('sector', 8).catch(() => null);
+  const falls = await apiHot('sector_fall', 8).catch(() => null);
   if (stocks && stocks.length) { renderTicker(stocks); renderHotStocks(stocks); }
   else { renderTicker([]); showHotDegraded('stock'); }
-  if (sectors && sectors.length) { renderHotSectors(sectors); }
+  if (sectors && sectors.length) { renderHotSectors('hot-sectors', 'hot-sectors-card', sectors); }
   else { showHotDegraded('sector'); }
+  if (falls && falls.length) { renderHotSectors('hot-fall', 'hot-fall-card', falls); }
+  else { showHotDegraded('sector_fall'); }
 }
 
 function retryHot() {

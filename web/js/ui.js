@@ -99,10 +99,10 @@ function showError(msg) {
 }
 function hideError() { $('error-box').classList.add('hidden'); }
 
-/* ---- 热门板块（chip） ---- */
-function renderHotSectors(items) {
-  const el = $('hot-sectors');
-  if (!items || !items.length) { $('hot-sectors-card').classList.add('hidden'); return; }
+/* ---- 板块 chip（热门板块 / 暴跌板块复用，点击查看成分股） ---- */
+function renderHotSectors(containerId, cardId, items) {
+  const el = $(containerId);
+  if (!items || !items.length) { $(cardId).classList.add('hidden'); return; }
   let html = '';
   for (const it of items) {
     const lvl = chgLevel(it.change_pct);
@@ -113,7 +113,7 @@ function renderHotSectors(items) {
       '<span class="hp ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
   }
   el.innerHTML = html;
-  $('hot-sectors-card').classList.remove('hidden');
+  $(cardId).classList.remove('hidden');
 }
 
 /* ---- 热门股票（行，点击查询） ---- */
@@ -157,9 +157,14 @@ function renderTicker(items) {
 }
 
 /* ---- 热门辅助数据：友好降级 ---- */
+const hotDegradedMap = {
+  stock: ['hot-stocks', 'hot-stocks-card'],
+  sector: ['hot-sectors', 'hot-sectors-card'],
+  sector_fall: ['hot-fall', 'hot-fall-card'],
+};
 function showHotDegraded(type) {
-  const id = type === 'stock' ? 'hot-stocks' : 'hot-sectors';
-  const card = type === 'stock' ? 'hot-stocks-card' : 'hot-sectors-card';
+  const pair = hotDegradedMap[type] || ['hot-sectors', 'hot-sectors-card'];
+  const id = pair[0], card = pair[1];
   $('hot-stocks-label') && ($('hot-stocks-label').textContent = '');
   $('hot-stocks-back') && $('hot-stocks-back').classList.add('hidden');
   $(id).innerHTML = '<div class="degraded" style="margin-top:8px">热门行情数据暂时不可用，请稍后重试。' +

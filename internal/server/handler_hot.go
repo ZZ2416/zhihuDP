@@ -10,17 +10,17 @@ import (
 	"zhihudp/internal/types"
 )
 
-// handleHot GET /api/hot?type=stock|sector|sector_stock&count=&code=
+// handleHot GET /api/hot?type=stock|sector|sector_fall|sector_stock&count=&code=
 // 热门榜（展示数据，不进 LLM）
 func (s *Server) handleHot(w http.ResponseWriter, r *http.Request) {
 	typ := r.URL.Query().Get("type")
-	if typ != "stock" && typ != "sector" && typ != "sector_stock" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type 需为 stock / sector / sector_stock"})
+	if typ != "stock" && typ != "sector" && typ != "sector_fall" && typ != "sector_stock" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type 需为 stock / sector / sector_fall / sector_stock"})
 		return
 	}
 
 	count := 8
-	if typ == "sector" {
+	if typ == "sector" || typ == "sector_fall" {
 		count = 6
 	}
 	if c := r.URL.Query().Get("count"); c != "" {
