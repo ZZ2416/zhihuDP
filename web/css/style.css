@@ -246,50 +246,30 @@ footer p { margin: 3px 0; }
 .hot-chip { cursor: pointer; transition: background .2s, border-color .2s; }
 .hot-chip:hover { border-color: var(--accent); background: var(--accent-weak); }
 
-/* 知乎热榜（主数据源） */
-.zhihu-hot-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--border); }
-.zhihu-hot-item:first-child { border-top: none; }
-.zhihu-hot-item .rank { font-size: 13px; font-weight: 800; color: var(--accent); width: 22px; text-align: center; flex: none; }
-.zhihu-hot-item:nth-child(-n+3) .rank { color: var(--bull); }
-.zhihu-hot-item a { font-size: 14px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.zhihu-hot-item a:hover { color: var(--accent); text-decoration: none; }
 
-/* ===== 布局升级：双栏工作区 + 侧边栏 ===== */
-.wrap { max-width: 1120px; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-.main-col { min-width: 0; }
-.side-col { position: sticky; top: 118px; display: flex; flex-direction: column; gap: 14px; }
-@media (max-width: 960px) {
-  .workspace { grid-template-columns: 1fr; }
-  .side-col { position: static; }
-}
+/* ticker 标题（热门行情，置于滚动条上方） */
+.ticker-title { font-size: 13px; font-weight: 700; color: var(--sub); letter-spacing: .06em; margin: 0 2px 8px; }
 
-/* ticker 放大醒目（主题色渐变条，三层信息） */
+/* ticker 滚动条：底色与页面背景一致，内容醒目，涨=红点位 跌=绿点位 */
 .ticker-bar {
-  min-height: 72px; border: none; border-radius: 14px; margin-bottom: 16px;
-  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-deep) 100%);
-  box-shadow: 0 6px 20px rgba(0, 100, 255, .18);
-}
-.ticker-bar::before {
-  content: "● 热门"; color: #fff; font-weight: 800; font-size: 12px; letter-spacing: .12em;
-  display: flex; align-items: center; padding: 0 18px; flex: none;
-  background: rgba(255, 255, 255, .12); backdrop-filter: blur(4px);
-  text-shadow: 0 1px 2px rgba(0,0,0,.2);
+  min-height: 72px; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 16px;
+  background: var(--bg);
 }
 .ticker-item {
   display: flex; flex-direction: column; justify-content: center; gap: 3px;
-  padding: 10px 22px; border-right: 1px solid rgba(255,255,255,.22);
-  cursor: pointer; color: #fff; flex: none;
+  padding: 10px 22px; border-right: 1px solid var(--border);
+  cursor: pointer; color: var(--text); flex: none;
 }
-.ticker-item:hover { background: rgba(255,255,255,.14); }
-.ticker-item .tn { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.ticker-item:hover { background: var(--card-soft); }
+.ticker-item .tn { font-size: 14px; font-weight: 700; line-height: 1.2; color: var(--text); }
 .ticker-item .row2 { display: flex; align-items: center; gap: 8px; }
-.ticker-item .tp { font-size: 12px; opacity: .88; }
+.ticker-item .tp { font-size: 12px; color: var(--sub); }
 .ticker-item .td { font-size: 13px; font-weight: 700; line-height: 1.2; }
-.ticker-item .up, .ticker-item .down { color: #fff; }
+.ticker-item .up { color: var(--bull); }
+.ticker-item .down { color: var(--bear); }
 .ticker-item .up::before, .ticker-item .down::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
-.ticker-item .up::before { background: #ffd9d5; }
-.ticker-item .down::before { background: #c8f5d8; }
+.ticker-item .up::before { background: var(--bull); }
+.ticker-item .down::before { background: var(--bear); }
 
 /* hero：看山看报表 SVG 场景 */
 .mascot-scene { width: min(320px, 82%); margin: 0 auto 12px; display: block; }

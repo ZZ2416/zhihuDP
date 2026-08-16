@@ -139,9 +139,6 @@ window.addEventListener('load', () => $('stock-input').focus());
 
 /* ---- 首页热门加载：知乎热榜（主）+ 股票/板块（辅助，失败友好降级） ---- */
 async function loadHomeHot() {
-  // 知乎热榜（主数据源，每 3h 更新；失败静默隐藏）
-  apiZhihuHot(10).then(items => { if (items) renderZhihuHot(items); }).catch(() => {});
-
   // 股票/板块（辅助数据，限流时友好降级 + 重试）
   const stocks = await apiHot('stock', 10).catch(() => null);
   const sectors = await apiHot('sector', 8).catch(() => null);

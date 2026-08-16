@@ -36,11 +36,6 @@ type HotProvider interface {
 	GetSectorStocks(ctx context.Context, code string, count int) ([]types.HotItem, error)
 }
 
-// ZhihuHotProvider 知乎热榜服务接口（由 *zhihu.Client.HotList 实现，主数据源）
-type ZhihuHotProvider interface {
-	HotList(ctx context.Context, count int) ([]types.ZhihuHotItem, error)
-}
-
 // Server HTTP 层（依赖注入：实现在 cmd/server.main 组装）
 type Server struct {
 	analyzer      Analyzer
@@ -48,19 +43,17 @@ type Server struct {
 	klineProvider KlineProvider
 	newsProvider  NewsProvider
 	hotProvider   HotProvider
-	zhihuHot      ZhihuHotProvider
 	frontend      fs.FS // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, zhihuHot ZhihuHotProvider, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
 		klineProvider: klineProvider,
 		newsProvider:  newsProvider,
 		hotProvider:   hotProvider,
-		zhihuHot:      zhihuHot,
 		frontend:      frontend,
 	}
 }
@@ -71,8 +64,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/resolve", s.handleResolve)   // 探针：股票识别（无需密钥）
 	mux.HandleFunc("GET /api/kline", s.handleKline)       // 行情：报价 + 日K线
 	mux.HandleFunc("GET /api/news", s.handleNews)         // 资讯：相关新闻（辅助）
-	mux.HandleFunc("GET /api/hot", s.handleHot)           // 热门：股票/板块榜（辅助）
-	mux.HandleFunc("GET /api/zhihu-hot", s.handleZhihuHot) // 知乎热榜（主数据源）
+	mux.HandleFunc("GET /api/hot", s.handleHot)           // 热门：股票/板块榜
 	mux.HandleFunc("POST /api/ask", s.handleAsk)          // SSE：完整分析
 	mux.Handle("GET /", http.FileServer(http.FS(s.frontend))) // 前端：index.html + css/js 静态资源
 	return mux

@@ -51,9 +51,6 @@ func main() {
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
 		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
-		zhihuHotProviderFunc(func(ctx context.Context, count int) ([]types.ZhihuHotItem, error) {
-			return zhClient.HotList(ctx, count)
-		}),
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -83,8 +80,7 @@ var (
 	_ server.Resolver      = (resolverFunc)(nil)
 	_ server.KlineProvider = (klineProviderFunc)(nil)
 	_ server.NewsProvider  = (newsProviderFunc)(nil)
-	_ server.HotProvider      = hotProviderFunc{}
-	_ server.ZhihuHotProvider = (zhihuHotProviderFunc)(nil)
+	_ server.HotProvider = hotProviderFunc{}
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -99,13 +95,6 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
-}
-
-// zhihuHotProviderFunc 适配器：函数实现 → server.ZhihuHotProvider 接口
-type zhihuHotProviderFunc func(ctx context.Context, count int) ([]types.ZhihuHotItem, error)
-
-func (f zhihuHotProviderFunc) HotList(ctx context.Context, count int) ([]types.ZhihuHotItem, error) {
-	return f(ctx, count)
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口

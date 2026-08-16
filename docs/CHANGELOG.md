@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：ticker 重构 + 移除知乎热榜
+
+**ticker 重构**：
+- 底色改为**与页面背景一致**（`var(--bg)`），内容更醒目
+- 「热门行情」标题移到滚动条**上方**（替代原「● 热门」徽标）
+- **涨=红点位、跌=绿点位**（`--bull`/`--bear`，A股惯例）
+- 保留 72px 三层信息 + 自动滚动
+
+**移除知乎热榜**（「不需要了，不用过滤」）：
+- 前端：侧边栏知乎热榜卡片、renderZhihuHot、apiZhihuHot、loadHomeHot 调用全部删除
+- 后端：`/api/zhihu-hot`、`zhihu.Client.HotList`、`ZhihuHotProvider`、`types.ZhihuHotItem` 全部移除（含金融过滤）
+- 侧边栏仅剩「热门板块」
+
+**验证**：首页结构 ✅（ticker-title 在上、zhihu-hot 0 残留）、样式 ✅（var(--bg)/红涨绿跌）、zhihu-hot 404 ✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：ticker 优化（更高 + 更自然）
 
 **优化**：
