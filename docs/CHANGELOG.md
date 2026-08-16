@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-16 · K线面板交互（悬停/触摸查看当日明细）
+
+**设计**：`features/kline/INTERACTION.md`（命中检测 / 坐标换算 / 浮层规格 / 验收）
+
+**实现**（纯前端，后端零改动）：
+- `web/js/kline.js`：十字光标（虚线横竖线）+ 命中蜡烛高亮 + 明细浮层（日期/开收高低/成交量/涨跌幅，红涨绿跌）
+  - 命中检测 O(1)：`idx = clamp(floor((px-padL)/cw), 0, n-1)`
+  - viewBox↔CSS 坐标换算；浮层防溢出自动翻转
+  - 移动端：touchstart 锁定浮层、click 切换锁定；`touch-action:none`
+- `web/css/style.css`：`#kline-chart` 相对定位 + `.kline-tip` 浮层样式（明暗主题自适应）
+- `web/js/app.js`：`renderKline(candles, quote)` 传报价（首根涨跌幅计算）
+
+**验证**：8 个 JS 文件 node 语法检查全过 ✅、静态资源 200 ✅、API 回归 ✅
+
+---
+
 ## 2026-08-16 · 前端分层：独立 web/ 文件夹
 
 **背景**：前端从单文件 `internal/web/index.html`（内联 CSS/JS）重构为独立分层的 `web/` 文件夹。

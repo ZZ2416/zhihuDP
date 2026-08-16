@@ -105,7 +105,7 @@ async function fetchKline(code, market) {
     const data = await apiKline(code, market, 60);
     if (!data || !data.quote) { renderKlineError(); return; }
     renderQuote(data.quote);
-    renderKline(data.candles || []);
+    renderKline(data.candles || [], data.quote); // quote 用于首根涨跌幅计算
   } catch (e) { renderKlineError(); }
 }
 

@@ -113,6 +113,20 @@ header {
 .q-cell .v { font-size: 13px; font-weight: 600; margin-top: 2px; }
 @media (max-width: 560px) { .q-grid { grid-template-columns: repeat(3, 1fr); } }
 
+/* K线交互：容器相对定位 + 明细浮层 */
+#kline-chart { position: relative; }
+.kline-tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow); padding: 8px 12px; font-size: 12px; line-height: 1.7;
+  white-space: nowrap; min-width: 150px;
+}
+.kline-tip .d { font-weight: 700; margin-bottom: 3px; }
+.kline-tip .row { display: flex; gap: 12px; }
+.kline-tip b { font-weight: 600; }
+.kline-tip .up { color: var(--bull); }
+.kline-tip .down { color: var(--bear); }
+
 /* ===== 情绪面板 ===== */
 .degraded { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; }
 .heat { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; }
