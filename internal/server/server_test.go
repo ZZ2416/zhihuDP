@@ -192,3 +192,56 @@ func TestFilterInvalidLinks(t *testing.T) {
 		t.Fatalf("期望仅保留合法链接条目，实际 %d 条: %+v", len(got), got)
 	}
 }
+
+func TestQuotaStore(t *testing.T) {
+	q := NewQuota(3)
+	// 3 次内放行
+	for i := 1; i <= 3; i++ {
+		remain, ok := q.Consume("tok-a")
+		if !ok || remain != 3-i {
+			t.Fatalf("第 %d 次应放行，剩余 %d", i, remain)
+		}
+	}
+	// 第 4 次超限
+	if _, ok := q.Consume("tok-a"); ok {
+		t.Fatal("第 4 次应超限")
+	}
+	// 新 token 重新配额
+	if remain, ok := q.Consume("tok-b"); !ok || remain != 2 {
+		t.Fatalf("新 token 应重新配额，剩余 %d", remain)
+	}
+	// 空 token 拒绝
+	if _, ok := q.Consume(""); ok {
+		t.Fatal("空 token 应拒绝")
+	}
+}
+
+func TestAskQuotaExceeded(t *testing.T) {
+	s := newTestServer()
+	// 无 cookie → 每次都是新会话首次分配（测试直接构造小配额便于验证）
+	s.quota = NewQuota(1)
+	req := httptest.NewRequest(http.MethodPost, "/api/ask", strings.NewReader(`{"stock":"茅台"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("首次应 200，实际 %d", rec.Code)
+	}
+	// 同一 token 第二次 → 403
+	req2 := httptest.NewRequest(http.MethodPost, "/api/ask", strings.NewReader(`{"stock":"茅台"}`))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.AddCookie(&http.Cookie{Name: quotaTokenCookie, Value: "same-token"})
+	rec2 := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("首次带 token 应 200，实际 %d", rec2.Code)
+	}
+	req3 := httptest.NewRequest(http.MethodPost, "/api/ask", strings.NewReader(`{"stock":"茅台"}`))
+	req3.Header.Set("Content-Type", "application/json")
+	req3.AddCookie(&http.Cookie{Name: quotaTokenCookie, Value: "same-token"})
+	rec3 := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusForbidden {
+		t.Fatalf("超限应 403，实际 %d", rec3.Code)
+	}
+}

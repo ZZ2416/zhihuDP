@@ -19,3 +19,6 @@ config.yaml
 *.c4d
 *.ai
 *.psd
+
+# RSA 私钥（部署者本地 ~/.zhihudp/zhihudp_private.pem；此处兜底防误提交）
+**/zhihudp_private.pem

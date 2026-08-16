@@ -4,11 +4,58 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"io/fs"
 	"net/http"
+	"sync"
 
 	"zhihudp/internal/types"
 )
+
+// quotaTokenCookie 会话配额令牌 Cookie 名：每次「打开页面」（新会话）分配 20 次 API 调用机会
+const quotaTokenCookie = "zhihudp_token"
+
+// QuotaStore 会话配额：token → 剩余调用次数（内存；重启重置，demo 可接受）
+type QuotaStore struct {
+	mu     sync.Mutex
+	tokens map[string]int
+	limit  int
+}
+
+// NewQuota 创建配额存储
+func NewQuota(limit int) *QuotaStore {
+	if limit < 1 {
+		limit = 20
+	}
+	return &QuotaStore{tokens: map[string]int{}, limit: limit}
+}
+
+// Consume 扣减一次调用；返回 (剩余次数, 是否允许)。false = 超限。
+func (q *QuotaStore) Consume(token string) (int, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if token == "" {
+		return 0, false
+	}
+	remain, ok := q.tokens[token]
+	if !ok {
+		remain = q.limit // 未知 token：视为新会话，首次分配（兜底）
+	}
+	if remain <= 0 {
+		return 0, false
+	}
+	remain--
+	q.tokens[token] = remain
+	return remain, true
+}
+
+// newQuotaToken 生成随机会话令牌
+func newQuotaToken() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 // Analyzer 分析服务接口（由 internal/agent.RunAnalysis 实现）
 type Analyzer interface {
@@ -73,7 +120,8 @@ type Server struct {
 	knowledge     KnowledgeProvider
 	keyService    KeyService
 	chatProvider  ChatProvider
-	frontend      fs.FS // 前端资源（go:embed，由入口注入）
+	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
+	frontend      fs.FS       // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
@@ -87,6 +135,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		knowledge:     knowledge,
 		keyService:    keyService,
 		chatProvider:  chatProvider,
+		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		frontend:      frontend,
 	}
 }
@@ -104,6 +153,32 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/ask", s.handleAsk)                // SSE：完整分析
 	mux.HandleFunc("POST /api/chat", s.handleChat)              // SSE：二期看山追问对话
 	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)   // 二期：清空某股票会话
-	mux.Handle("GET /", http.FileServer(http.FS(s.frontend)))   // 前端：index.html + css/js 静态资源
+	// 首页：下发会话配额令牌 Cookie（每次打开页面 = 新会话 = 20 次 API 调用机会）
+	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := r.Cookie(quotaTokenCookie); err != nil {
+			http.SetCookie(w, &http.Cookie{
+				Name: quotaTokenCookie, Value: newQuotaToken(),
+				Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
+			})
+		}
+		http.FileServer(http.FS(s.frontend)).ServeHTTP(w, r)
+	}))
 	return mux
+}
+
+// consumeQuota 扣减会话配额；无 cookie 时自动分配新令牌（Set-Cookie）并计数。
+// 超限返回 false（调用方返回 403）。
+func (s *Server) consumeQuota(w http.ResponseWriter, r *http.Request) (int, bool) {
+	token := ""
+	if c, err := r.Cookie(quotaTokenCookie); err == nil {
+		token = c.Value
+	}
+	if token == "" {
+		token = newQuotaToken()
+		http.SetCookie(w, &http.Cookie{
+			Name: quotaTokenCookie, Value: token,
+			Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		})
+	}
+	return s.quota.Consume(token)
 }

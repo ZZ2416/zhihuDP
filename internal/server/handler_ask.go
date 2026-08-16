@@ -23,6 +23,11 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stock is required"})
 		return
 	}
+	// 会话配额：每次打开页面 20 次 API 调用机会（与 /api/ask 共享）
+	if _, ok := s.consumeQuota(w, r); !ok {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "本次访问的 API 调用次数已用完（20 次），请重新打开页面"})
+		return
+	}
 
 	// SSE 响应头
 	w.Header().Set("Content-Type", "text/event-stream")
