@@ -118,16 +118,8 @@ header {
 
 .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 .section-title::before { content: ""; width: 4px; height: 15px; border-radius: 2px; background: var(--accent); }
-/* 📈 板块 / 📉 暴跌板块：红绿底白字徽章（涨跌对应，双主题可读） */
-.section-title-rise, .section-title-fall {
-  color: #fff;
-  border-radius: 8px;
-  padding: 5px 12px;
-  display: inline-flex;
-  width: fit-content;
-}
-.section-title-rise { background: var(--lvl-up3); } /* 涨=红底 */
-.section-title-fall { background: var(--bear); }    /* 跌=绿底 */
+/* 上升板块 / 暴跌板块：纯文字白字（无背景、无徽章），涨跌语义由 emoji 去掉后仅靠文字区分 */
+.section-title-rise, .section-title-fall { color: #fff; }
 .section-title-rise::before, .section-title-fall::before { display: none; }
 
 /* ===== 实时行情 ===== */
