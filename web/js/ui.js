@@ -73,13 +73,13 @@ function ratioRow(label, cls, val) {
     '<span class="rpct">' + p + '%</span></div>';
 }
 
-/* ---- 相关资讯（辅助） ---- */
+/* ---- 相关资讯（辅助，仅参考展示，不跳转外部） ---- */
 function renderNews(items) {
   if (!items || !items.length) return; // 无资讯不显示卡片
   let html = '<div class="news-list">';
   for (const it of items) {
     html += '<div class="news-item">' +
-      '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '(无标题)') + '</a>' +
+      '<span class="t" title="外部资讯仅供参考，不提供跳转">' + esc(it.title || '(无标题)') + '</span>' +
       '<span class="date">' + esc((it.date || '').slice(0, 10)) + '</span>' +
       '<span class="src">' + esc(it.source || '') + '</span>' +
       '</div>';
