@@ -51,3 +51,33 @@ type Event struct {
 	Type string
 	Data any
 }
+
+// Candle 单根日K
+type Candle struct {
+	Date   string  `json:"date"` // 2026-08-12
+	Open   float64 `json:"open"`
+	Close  float64 `json:"close"`
+	High   float64 `json:"high"`
+	Low    float64 `json:"low"`
+	Volume float64 `json:"volume"` // 手
+}
+
+// Quote 实时报价（东财字段 ÷100 换算后）
+type Quote struct {
+	Code      string  `json:"code"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`      // 最新价
+	Change    float64 `json:"change"`     // 涨跌额
+	ChangePct float64 `json:"change_pct"` // 涨跌幅 %
+	Open      float64 `json:"open"`
+	High      float64 `json:"high"`
+	Low       float64 `json:"low"`
+	Volume    float64 `json:"volume"` // 手
+	PrevClose float64 `json:"prev_close"`
+}
+
+// Kline 行情响应（GET /api/kline 返回体）
+type Kline struct {
+	Quote   Quote    `json:"quote"`
+	Candles []Candle `json:"candles"` // 升序（旧→新）；空数组表示无数据
+}

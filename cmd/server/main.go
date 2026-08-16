@@ -12,11 +12,12 @@ import (
 
 	"zhihudp/internal/agent"
 	"zhihudp/internal/config"
+	"zhihudp/internal/kline"
 	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
-	"zhihudp/internal/web"
+	"zhihudp/web"
 	"zhihudp/internal/zhihu"
 )
 
@@ -39,16 +40,13 @@ func main() {
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
 	deps := buildDeps(cfg)
-	indexHTML, err := web.FS.ReadFile("index.html")
-	if err != nil {
-		log.Fatalf("读取前端资源失败: %v", err)
-	}
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
 		}),
 		resolverFunc(stock.Resolve),
-		indexHTML,
+		klineProviderFunc(kline.GetKline),
+		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -73,9 +71,17 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 
 // 编译期断言：适配器满足 server 接口（house style）
 var (
-	_ server.Analyzer = (analyzerFunc)(nil)
-	_ server.Resolver = (resolverFunc)(nil)
+	_ server.Analyzer      = (analyzerFunc)(nil)
+	_ server.Resolver      = (resolverFunc)(nil)
+	_ server.KlineProvider = (klineProviderFunc)(nil)
 )
+
+// klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
+type klineProviderFunc func(ctx context.Context, market, code string, days int) (*types.Kline, error)
+
+func (f klineProviderFunc) GetKline(ctx context.Context, market, code string, days int) (*types.Kline, error) {
+	return f(ctx, market, code, days)
+}
 
 // buildDeps 组装 agent 依赖（业务层接线点）
 func buildDeps(cfg *config.Config) agent.Deps {

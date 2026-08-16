@@ -23,7 +23,7 @@
 ## 2. 总体架构与时序图
 
 ```
-前端 internal/web/index.html（首页搜索 + 详情页，原生 HTML/JS，go:embed 内嵌）
+前端 web/（首页搜索 + 详情页，原生 HTML/CSS/JS 分层，go:embed 内嵌）
   ↓ POST /api/ask {"stock":"..."} → SSE 事件流
 main.go —— HTTP 路由、SSE 写入、事件解析、合规过滤
   ↓ runner.Query（流式）
@@ -59,7 +59,11 @@ zhihuDP/
 │   ├── compliance/              # 合规过滤（Filter / FilterFinal）
 │   ├── config/                  # 配置加载（Load）
 │   ├── types/                   # 共享结构 + 哨兵错误（ErrStockNotFound 等）
-│   └── web/                     # 前端资源（go:embed index.html）
+│   └── web/                     # 前端（独立文件夹，HTML/CSS/JS 分层）
+│       ├── index.html          # 页面骨架
+│       ├── css/style.css       # 设计系统 + 组件样式
+│       ├── js/{util,theme,api,sse,markdown,kline,ui,app}.js  # 分层：工具/主题/API/SSE/渲染/图表/入口
+│       └── embed.go            # go:embed 内嵌（index.html css js）
 ├── docs/
 │   └── CHANGELOG.md
 ├── config.example.yaml
@@ -98,7 +102,7 @@ internal/zhihu       ◄── cmd/server（组装）/ sentiment.Analyze 入参
 internal/sentiment   ◄── cmd/server（buildDeps 注入）
 internal/compliance  ◄── internal/agent（delta 过滤）
 internal/agent       ◄── cmd/server（适配为 Analyzer 接口）
-internal/web         ◄── cmd/server（go:embed 读取）
+web                ◄── cmd/server（go:embed 读取）
 internal/server      ◄── cmd/server（New 注入接口实装）
 ```
 
@@ -196,7 +200,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 | `internal/sentiment` | 情绪分析编排：搜索→LLM 分类→规则强度分 | zhihu、eino-ext/deepseek |
 | `internal/agent` | ADK agent 组装 + 事件分发（`Deps` 注入） | eino/adk、eino-ext/deepseek、compliance |
 | `internal/compliance` | 禁用词过滤 | 无 |
-| `internal/web` | 前端资源（go:embed） | 无 |
+| `web`（根目录独立文件夹） | 前端资源：index.html 骨架 + css/style.css + js/ 八模块（util/theme/api/sse/markdown/kline/ui/app） | go:embed |
 
 ### 3.2 内部方法
 
@@ -406,7 +410,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 ### HTTP 接口：GET /
 
-- 托管 `internal/web/index.html`（go:embed 内嵌）
+- 托管 `web/`（go:embed 内嵌，FileServer 提供 index.html + css/js 静态资源）
 
 ## 5. 数据/缓存/配置变更
 
@@ -439,7 +443,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 1. **M0 骨架 + 数据客户端**：`go mod init`、`zhihu.go`、`stock.go`、`GET /api/resolve` 探针。验证：`curl "localhost:8080/api/resolve?q=茅台"` 返回东财结果
 2. **M1 情绪分析 + Agent**：`sentiment.go`（分类+强度分）、`agent.go`（2 工具）、命令行跑通「识别→情绪→分析文案」。验证：`go run . 茅台` 打印 SentimentResult + 三段文案；**5 只热门股各抽 10 条分类结果人工核对，明显错误 ≤2 条（业务验收 #8）**
-3. **M2 Web 层**：`cmd/server` SSE、`internal/compliance`、`internal/web/index.html` 两页（搜索页 + 详情页，`fetch`+`ReadableStream` 手写 SSE 解析）。验证：浏览器端到端流式展示
+3. **M2 Web 层**：`cmd/server` SSE、`internal/compliance`、`web/` 分层前端（index.html + css/style.css + js/ 八模块）。验证：浏览器端到端流式展示
 4. **M3 打磨**：`config.example.yaml` 模板、README、免责声明、错误收口、日志脱敏
 
 ## 7. 上线三板斧（demo 版）

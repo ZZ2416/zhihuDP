@@ -6,6 +6,71 @@
 
 ---
 
+## 2026-08-16 · K线面板交互（悬停/触摸查看当日明细）
+
+**设计**：`features/kline/INTERACTION.md`（命中检测 / 坐标换算 / 浮层规格 / 验收）
+
+**实现**（纯前端，后端零改动）：
+- `web/js/kline.js`：十字光标（虚线横竖线）+ 命中蜡烛高亮 + 明细浮层（日期/开收高低/成交量/涨跌幅，红涨绿跌）
+  - 命中检测 O(1)：`idx = clamp(floor((px-padL)/cw), 0, n-1)`
+  - viewBox↔CSS 坐标换算；浮层防溢出自动翻转
+  - 移动端：touchstart 锁定浮层、click 切换锁定；`touch-action:none`
+- `web/css/style.css`：`#kline-chart` 相对定位 + `.kline-tip` 浮层样式（明暗主题自适应）
+- `web/js/app.js`：`renderKline(candles, quote)` 传报价（首根涨跌幅计算）
+
+**验证**：8 个 JS 文件 node 语法检查全过 ✅、静态资源 200 ✅、API 回归 ✅
+
+---
+
+## 2026-08-16 · 前端分层：独立 web/ 文件夹
+
+**背景**：前端从单文件 `internal/web/index.html`（内联 CSS/JS）重构为独立分层的 `web/` 文件夹。
+
+**结构**：
+```
+web/
+├── index.html          # 页面骨架（外链 css/js，无内联样式脚本）
+├── css/style.css       # 设计系统（明暗主题变量）+ 组件样式
+├── js/
+│   ├── util.js         # 工具（$ / esc）
+│   ├── theme.js        # 主题切换
+│   ├── api.js          # API 层（resolve / kline / ask）
+│   ├── sse.js          # SSE 协议解析
+│   ├── markdown.js     # AI 分析 markdown 渲染
+│   ├── kline.js        # K线 SVG 蜡烛图
+│   ├── ui.js           # 展示层（报价卡/情绪面板/错误）
+│   └── app.js          # 入口（视图/事件/状态）
+└── embed.go            # go:embed 内嵌（index.html css js）
+```
+
+**变更**：
+- `internal/web` 移除 → 顶层 `web/` 独立文件夹（与 cmd/internal 平级）
+- `server.New` 签名：`indexHTML []byte` → `frontend fs.FS`；Routes 用 `http.FileServer` 提供 index.html + 静态资源
+- `internal/server/handler_index.go` 删除（FileServer 接管）
+
+**验证**：首页外链 9 个静态资源全 200 ✅、resolve/kline 200 ✅、SSE 全链路（847 delta）✅、lint/test 全绿 ✅
+
+---
+
+## 2026-08-16 · feature/kline：K线图与股价信息（实现完成）
+
+**需求/设计**：`features/kline/SRS.md` + `features/kline/SDD.md`（分支内评审通过）
+
+**新增**：
+- `internal/kline`（dao 层）：腾讯接口单请求获取日K线 + 实时报价（前复权）
+- `GET /api/kline?code=&market=&days=`（days clamp [10,250]，默认 60）
+- 前端：股价卡（最新价/涨跌幅红涨绿跌/今开最高最低昨收成交量）+ **SVG 蜡烛图**（MA5/10/20 均线 + 成交量柱 + 坐标轴，明暗主题自适应）
+- 行情经 `stock` 事件触发异步拉取，与 SSE 分析流并行，失败降级不影响情绪/AI
+
+**实测发现并修复**：
+- 东财接口密集请求后被限流（持续 EOF）→ 改用腾讯（单请求稳定）
+- 腾讯除权除息日 K线行尾带**分红对象**（`{"FHcontent":"10派280.242元"}`）→ `[][]string` 解析炸，改用 RawMessage 宽容解析
+- Go 默认 UA 曾被拒 → 请求带浏览器 UA
+
+**验证**：茅台 60 根K线+报价（1341.99/-0.98%）✅、比亚迪 30 根 ✅、参数校验 400 ✅、SSE 回归 ✅、lint/test 全绿
+
+---
+
 ## 2026-08-16 · M3 收尾：正式 README
 
 - 替换 GitHub 自动生成的占位 README（原仅两行）

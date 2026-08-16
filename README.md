@@ -104,7 +104,7 @@ zhihuDP/
 │   ├── compliance/        # 合规禁用词过滤
 │   ├── config/            # 配置文件加载（YAML + env 覆盖 + 脱敏）
 │   ├── types/             # 共享结构 + 哨兵错误
-│   └── web/               # 前端（go:embed 内嵌）
+│   └── web/               # 前端（独立分层：index.html + css/ + js/ 八模块）
 └── docs/CHANGELOG.md      # 变更记录
 ```
 

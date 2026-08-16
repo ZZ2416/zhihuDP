@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"zhihudp/internal/types"
 )
@@ -26,9 +28,27 @@ func (fakeAnalyzer) RunAnalysis(_ context.Context, _ string, sink func(types.Eve
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "ok"}})
 }
 
-func newTestServer() *Server {
-	return New(fakeAnalyzer{}, fakeResolver{}, []byte("<html>test</html>"))
+type fakeKlineProvider struct{}
+
+func (fakeKlineProvider) GetKline(_ context.Context, market, code string, days int) (*types.Kline, error) {
+	return &types.Kline{
+		Quote: types.Quote{Code: code, Name: "测试股", Price: 10.5, ChangePct: 1.2},
+		Candles: []types.Candle{
+			{Date: "2026-08-12", Open: 10, Close: 10.5, High: 10.8, Low: 9.9, Volume: 100},
+		},
+	}, nil
 }
+
+func newTestServer() *Server {
+	frontend := fstest.MapFS{
+		"index.html":      {Data: []byte("<html>test</html>")},
+		"css/style.css":   {Data: []byte("body{}")},
+		"js/app.js":       {Data: []byte("// app")},
+	}
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, frontend)
+}
+
+var _ fs.FS = (fstest.MapFS)(nil)
 
 func TestResolveHandler(t *testing.T) {
 	s := newTestServer()
