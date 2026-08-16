@@ -4,7 +4,7 @@
 > 日期：2026-08-16
 > 状态：待评审
 > 分支：`feature/kline`
-> 依据：`docs/kline-SRS.md`（需求规格）
+> 依据：`features/kline/SRS.md`（需求规格）
 > 原则：**行情数据为展示数据，不进 LLM 上下文**（合规红线，SRS FR6）
 
 ---
