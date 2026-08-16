@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-16 · v0.4.0 Router/Handler/Service 分层
+
+**背景**：评审认为入口应分层（router/handler/service），本次按四层改造。
+
+**变更**：
+- 新增 `internal/server`（HTTP 层）：`Analyzer`/`Resolver` 接口 + `Server.New` + `Routes` + 3 个 handler + `response.go`
+- `cmd/server/main.go` 瘦身：从 ~190 行降到 ~90 行，只留「配置 → buildDeps → server.New → 启动」
+- 依赖倒置：handler 依赖接口，实装经适配器（`analyzerFunc`/`resolverFunc`）注入
+- 哨兵错误移入 `internal/types`（`ErrStockNotFound`/`ErrEmptyQuery`），避免 handler 反向依赖 data 层
+- 新增 `internal/server/server_test.go`：httptest + mock 接口实现，6 个用例（resolve 200/404/400、ask SSE、index）
+
+**验证**：build / vet / test 全过（含新 server 测试）；探针 200、首页 200、无密钥降级路径一致。
+**文档同步**：`tech-design.md` v1.2→v1.3（§2.1 目录/依赖/分层调用、§3.1 模块表）。
+
+---
+
 ## 2026-08-16 · CR 修复（评审轮）
 
 **问题与修复**：

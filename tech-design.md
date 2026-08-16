@@ -1,10 +1,10 @@
 # 知乎股票情绪分析工具 — 技术设计
 
-> 版本：v1.2
+> 版本：v1.3
 > 日期：2026-08-16
 > 状态：初稿待评审
 > 关联文档：`business-design.md`（业务设计文档 v1.0，规则与验收准绳）；`product-design.md`（产品设计稿 v0.1）
-> 变更：v1.1 解耦旧 design.md（已废弃，不再引用），对齐业务设计 §4 规则与 §6 验收标准；v1.2 目录结构升级为标准 cmd/internal 布局（依赖注入、go:embed 前端）
+> 变更：v1.1 解耦旧 design.md（已废弃，不再引用）；v1.2 目录结构升级为标准 cmd/internal 布局（依赖注入、go:embed 前端）；v1.3 增加 Router/Handler/Service/Data 四层（internal/server + Analyzer/Resolver 接口 + 哨兵错误）
 
 ---
 
@@ -37,31 +37,29 @@ stock.go / zhihu.go / sentiment.go / compliance.go（独立模块）
 
 ### 2.1 项目架构定义（M0 落地依据）
 
-**① 项目目录结构（标准 cmd/internal 布局，v1.2 重构）**
+**① 项目目录结构（标准 cmd/internal 布局 + Router/Handler/Service/Data 四层，v1.3 分层）**
 
 ```
 zhihuDP/
 ├── cmd/
 │   └── server/
-│       └── main.go              # 入口：config.Load → buildDeps 组装 → 路由 → 启动；含 CLI 模式(-q)
+│       └── main.go              # 入口（薄）：config.Load → buildDeps → server.New → 启动；CLI 模式(-q)
 ├── internal/
-│   ├── config/
-│   │   └── config.go            # Config / Load（yaml + env 覆盖 + 默认值 + 脱敏），独立包
-│   ├── types/
-│   │   └── types.go             # StockInfo / SentimentResult / Ratio / ViewItem / Event
-│   ├── stock/
-│   │   └── stock.go             # Resolve（东财主 + 腾讯兜底），无配置依赖
-│   ├── zhihu/
-│   │   └── zhihu.go             # Client.New(cfg) + (c *Client).Search，知乎搜索
-│   ├── sentiment/
-│   │   └── sentiment.go         # Analyze(ctx, code, name, zh *zhihu.Client, ds config.DeepSeekConfig)
-│   ├── agent/
-│   │   └── agent.go             # Deps 依赖注入 + RunAnalysis(ctx, query, deps, sink)
-│   ├── compliance/
-│   │   └── compliance.go        # Filter（流式块级）/ FilterFinal（完整文本句级）
-│   └── web/
-│       ├── embed.go             # //go:embed index.html（前端内嵌，不依赖运行目录）
-│       └── index.html           # 前端：单文件双视图（搜索页 + 详情页）
+│   ├── server/                  # HTTP 层：Router + Handler（依赖 Analyzer/Resolver 接口）
+│   │   ├── server.go            # 接口定义 + Server{analyzer, resolver, indexHTML} + New + Routes
+│   │   ├── handler_ask.go       # POST /api/ask（SSE 流式）
+│   │   ├── handler_resolve.go   # GET /api/resolve（探针）
+│   │   ├── handler_index.go     # GET /（go:embed 前端）
+│   │   ├── response.go          # writeJSON / writeSSE
+│   │   └── server_test.go       # httptest（mock 接口实现）
+│   ├── agent/                   # Service：ReAct 编排（Deps 注入 + RunAnalysis）
+│   ├── sentiment/               # Service：情绪分析（Analyze）
+│   ├── zhihu/                   # Data：知乎搜索客户端（Client.Search）
+│   ├── stock/                   # Data：股票识别（Resolve）
+│   ├── compliance/              # 合规过滤（Filter / FilterFinal）
+│   ├── config/                  # 配置加载（Load）
+│   ├── types/                   # 共享结构 + 哨兵错误（ErrStockNotFound 等）
+│   └── web/                     # 前端资源（go:embed index.html）
 ├── docs/
 │   └── CHANGELOG.md
 ├── config.example.yaml
@@ -69,17 +67,27 @@ zhihuDP/
 └── go.mod / go.sum
 ```
 
+**分层调用关系**：
+
+```
+Router(server.Routes) → Handler(server.handle*) → Service 接口(Analyzer/Resolver)
+                                                    ├─ agent.RunAnalysis（编排）
+                                                    │    └─ sentiment.Analyze → zhihu.Client（Data）
+                                                    └─ stock.Resolve（Data）
+```
+
 **② 模块依赖（import 方向，单向无环；依赖注入避免全局状态）**
 
 ```
-internal/types       ◄── 全部业务包
+internal/types       ◄── 全部业务包（含哨兵错误，handler 不反向依赖 data 层）
 internal/config      ◄── cmd/server / sentiment / agent / zhihu
-internal/stock       ◄── cmd/server（探针）/ agent.Deps
+internal/stock       ◄── cmd/server（适配为 Resolver 接口）
 internal/zhihu       ◄── cmd/server（组装）/ sentiment.Analyze 入参
 internal/sentiment   ◄── cmd/server（buildDeps 注入）
 internal/compliance  ◄── internal/agent（delta 过滤）
-internal/agent       ◄── cmd/server（RunAnalysis）
-internal/web         ◄── cmd/server（go:embed 前端）
+internal/agent       ◄── cmd/server（适配为 Analyzer 接口）
+internal/web         ◄── cmd/server（go:embed 读取）
+internal/server      ◄── cmd/server（New 注入接口实装）
 ```
 
 **③ 并发模型**：单进程；每个 `/api/ask` 一个 goroutine，各自创建独立 agent/runner 实例（无共享可变状态，天然并发安全）；各包**无全局变量**（依赖经 `buildDeps` 显式注入）；无 DB/缓存/队列。
@@ -167,9 +175,10 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 | 包/文件 | 职责 | 依赖 |
 |---|---|---|
-| `cmd/server/main.go` | 入口：配置加载、`buildDeps` 组装、路由（SSE/探针/前端）、CLI 模式 | 全部 internal 包 |
+| `cmd/server/main.go` | 入口：配置加载、`buildDeps` 组装、注入 `server.New`、启动、CLI 模式 | 全部 internal 包 |
+| `internal/server` | HTTP 层：Router（Routes）+ Handler（SSE/探针/前端）+ `Analyzer`/`Resolver` 接口 | agent/stock 接口、types、web |
 | `internal/config` | 配置加载（YAML + env 覆盖 + 默认值 + 脱敏） | gopkg.in/yaml.v3 |
-| `internal/types` | 共享数据结构（StockInfo / SentimentResult / Event 等） | 无 |
+| `internal/types` | 共享数据结构 + 哨兵错误（`ErrStockNotFound`/`ErrEmptyQuery`） | 无 |
 | `internal/stock` | 股票识别（东财主 + 腾讯兜底） | net/http，零第三方 |
 | `internal/zhihu` | 知乎搜索客户端（`Client.Search`，Bearer 鉴权） | net/http + json |
 | `internal/sentiment` | 情绪分析编排：搜索→LLM 分类→规则强度分 | zhihu、eino-ext/deepseek |

@@ -1,5 +1,13 @@
-// Package types 共享数据结构
+// Package types 共享数据结构与哨兵错误
 package types
+
+import "errors"
+
+// 哨兵错误（跨包边界使用，避免 handler 反向依赖 data 层）
+var (
+	ErrEmptyQuery    = errors.New("empty query")
+	ErrStockNotFound = errors.New("stock not found")
+)
 
 // StockInfo 股票识别结果
 type StockInfo struct {

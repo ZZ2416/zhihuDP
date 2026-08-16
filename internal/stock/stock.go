@@ -15,11 +15,6 @@ import (
 	"zhihudp/internal/types"
 )
 
-var (
-	ErrEmptyQuery = errors.New("empty query")
-	ErrNotFound   = errors.New("stock not found")
-)
-
 // eastmoney 接口响应（实测：searchapi.eastmoney.com/api/suggest/get）
 type eastmoneyResp struct {
 	QuotationCodeTable struct {
@@ -36,7 +31,7 @@ type eastmoneyResp struct {
 func Resolve(ctx context.Context, query string) (*types.StockInfo, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil, ErrEmptyQuery
+		return nil, types.ErrEmptyQuery
 	}
 
 	// 1) 东财主选
@@ -52,9 +47,9 @@ func Resolve(ctx context.Context, query string) (*types.StockInfo, error) {
 		return info, nil
 	}
 
-	// 两个源都确认无此股票 → 语义化为 ErrNotFound
-	if errors.Is(eastErr, ErrNotFound) && errors.Is(err, ErrNotFound) {
-		return nil, ErrNotFound
+	// 两个源都确认无此股票 → 语义化为 ErrStockNotFound
+	if errors.Is(eastErr, types.ErrStockNotFound) && errors.Is(err, types.ErrStockNotFound) {
+		return nil, types.ErrStockNotFound
 	}
 	return nil, fmt.Errorf("东财: %v；腾讯: %v", eastErr, err)
 }
@@ -95,7 +90,7 @@ func resolveViaEastmoney(ctx context.Context, query string) (*types.StockInfo, e
 	if fallback != nil {
 		return fallback, nil
 	}
-	return nil, ErrNotFound
+	return nil, types.ErrStockNotFound
 }
 
 // resolveViaTencent 解析腾讯返回（实测非标准 JSON：v_hint="sh~600519~...^sz~...";）
@@ -131,7 +126,7 @@ func resolveViaTencent(ctx context.Context, query string) (*types.StockInfo, err
 		return nil, fmt.Errorf("腾讯 v_hint 解析失败: %w", err)
 	}
 	if hint == "" || hint == "N" {
-		return nil, ErrNotFound
+		return nil, types.ErrStockNotFound
 	}
 
 	// sh~600519~贵州茅台~gzmt~GP-A；多条目 ^ 分隔，优先 A 股前缀
@@ -151,7 +146,7 @@ func resolveViaTencent(ctx context.Context, query string) (*types.StockInfo, err
 			return &types.StockInfo{Code: parts[1], Name: parts[2], Market: parts[0]}, nil
 		}
 	}
-	return nil, ErrNotFound
+	return nil, types.ErrStockNotFound
 }
 
 func doGet(req *http.Request, timeout time.Duration) ([]byte, error) {
