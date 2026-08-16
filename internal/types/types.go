@@ -84,7 +84,7 @@ type Kline struct {
 
 // NewsItem 相关资讯（GET /api/news 返回体元素）
 type NewsItem struct {
-	Title  string `json:"title"`  // 已清洗 <em> 高亮标签
+	Title  string `json:"title"` // 已清洗 <em> 高亮标签
 	Url    string `json:"url"`
 	Date   string `json:"date"`   // 2026-08-14 23:18:00
 	Source string `json:"source"` // 固定 "东方财富"
@@ -92,17 +92,33 @@ type NewsItem struct {
 
 // HotItem 热门榜单项（股票或板块，GET /api/hot 返回体元素）
 type HotItem struct {
-	Code      string  `json:"code"`       // 股票代码 / 板块代码
+	Code      string  `json:"code"` // 股票代码 / 板块代码
 	Name      string  `json:"name"`
 	Price     float64 `json:"price"`      // 最新价（板块为指数点位）
 	ChangePct float64 `json:"change_pct"` // 涨跌幅 %
 	Type      string  `json:"type"`       // stock / sector
 }
 
-
 // KnowledgeItem 知识库搜索结果条目（GET /api/knowledge 返回体元素）
 type KnowledgeItem struct {
-	Content  []string `json:"content"`  // 命中的内容片段
-	DocName  string   `json:"doc_name"` // 文档名（讨论标题）
-	OriginUrl string  `json:"origin_url"` // 知乎原文链接
+	Content   []string `json:"content"`    // 命中的内容片段
+	DocName   string   `json:"doc_name"`   // 文档名（讨论标题）
+	OriginUrl string   `json:"origin_url"` // 知乎原文链接
+}
+
+// ChatMessage 追问对话消息（会话历史）
+type ChatMessage struct {
+	Role    string `json:"role"` // user / assistant
+	Content string `json:"content"`
+}
+
+// ChatFacts 对话上下文事实快照（组装后注入 LLM）
+type ChatFacts struct {
+	StockName    string // 股票名
+	StockCode    string
+	Market       string // 市场（沪A/深A）
+	Quote        string // 行情快照文本（报价级）
+	Sentiment    string // 情绪面板摘要文本
+	Knowledge    string // 知识库检索片段
+	PrevAnalysis string // 一期 AI 分析文本（中性文案）
 }

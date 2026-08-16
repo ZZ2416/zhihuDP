@@ -39,3 +39,19 @@ async function apiKnowledge(q, limit) {
   if (!resp.ok) return null;
   return resp.json();
 }
+
+/* 二期：与看山对话 */
+async function apiChat(code, market, message) {
+  return fetch('/api/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stock: code, market: market || '', message })
+  });
+}
+
+async function apiChatReset(code) {
+  const resp = await fetch('/api/chat/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stock: code })
+  });
+  return resp.ok;
+}

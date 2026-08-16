@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"zhihudp/internal/agent"
+	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
 	"zhihudp/internal/hot"
 	"zhihudp/internal/keybox"
@@ -49,6 +50,24 @@ func main() {
 	}
 	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient}
 	deps := buildDeps(cfg, zhClient)
+
+	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
+	chatSvc := chat.New(chat.NewStore(10), chat.Deps{
+		Quote: func(ctx context.Context, market, code string) (*types.Quote, error) {
+			k, err := kline.GetKline(ctx, market, code, 1) // 仅取报价段，不取 K 线序列
+			if err != nil {
+				return nil, err
+			}
+			return &k.Quote, nil
+		},
+		Knowledge: func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error) {
+			return zhClient.KnowledgeSearch(ctx, query, []string{"7520243014858214186"}, limit)
+		},
+		ChatAgent: func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error {
+			return agent.Chat(ctx, facts, history, message, deps, sink)
+		},
+	})
+
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -60,8 +79,9 @@ func main() {
 		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
 			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
 		}),
-		ks,     // 密钥箱：公钥下发 + 加密密钥热更新
-		web.FS, // 前端资源（go:embed 内嵌）
+		ks,      // 密钥箱：公钥下发 + 加密密钥热更新
+		chatSvc, // 二期：看山追问对话
+		web.FS,  // 前端资源（go:embed 内嵌）
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

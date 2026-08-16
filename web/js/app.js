@@ -57,6 +57,8 @@ async function doSearch() {
   $('kline-chart').innerHTML = '';
   $('news-card').classList.add('hidden');
   $('news-body').innerHTML = '';
+  $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
+  $('chat-msgs').innerHTML = '';
   $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
   $('analysis').innerHTML = '';
   analysisText = '';
@@ -94,6 +96,7 @@ function handleEvent(event, data) {
         '<span class="fresh">实时检索</span>';
       fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
       fetchNews(d.name);            // 异步拉相关资讯（辅助，失败静默）
+      resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
     case 'sentiment': renderSentiment(d); break;
     case 'delta': appendDelta(d.text || ''); break;
