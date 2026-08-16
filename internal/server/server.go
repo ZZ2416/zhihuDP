@@ -51,6 +51,16 @@ type KeyService interface {
 	UpdateKeys(deepseekKey, zhihuSecret string) error
 }
 
+// ChatProvider 二期追问对话服务接口（由 internal/chat.Service 实现）
+type ChatProvider interface {
+	// Chat 处理一次追问：SSE 事件经 sink 转发（delta → done）
+	Chat(ctx context.Context, code, market, message string, sink func(types.Event) error) error
+	// SetSnapshot 一期 /api/ask 结束后写入结果快照（情绪 + 分析文本），供对话上下文使用
+	SetSnapshot(code string, stock types.StockInfo, sentiment *types.SentimentResult, analysis string)
+	// Reset 清空某股票的对话会话（前端「清空」按钮）
+	Reset(code string)
+}
+
 // Server HTTP 层（依赖注入：实现在 cmd/server.main 组装）
 type Server struct {
 	analyzer      Analyzer
@@ -60,11 +70,12 @@ type Server struct {
 	hotProvider   HotProvider
 	knowledge     KnowledgeProvider
 	keyService    KeyService
+	chatProvider  ChatProvider
 	frontend      fs.FS // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -73,6 +84,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		hotProvider:   hotProvider,
 		knowledge:     knowledge,
 		keyService:    keyService,
+		chatProvider:  chatProvider,
 		frontend:      frontend,
 	}
 }
@@ -88,6 +100,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/config/pubkey", s.handlePubKey)    // 密钥箱：下发 RSA 公钥
 	mux.HandleFunc("POST /api/config/keys", s.handleUpdateKeys) // 密钥箱：接收加密提交的用户密钥
 	mux.HandleFunc("POST /api/ask", s.handleAsk)                // SSE：完整分析
+	mux.HandleFunc("POST /api/chat", s.handleChat)              // SSE：二期看山追问对话
+	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)   // 二期：清空某股票会话
 	mux.Handle("GET /", http.FileServer(http.FS(s.frontend)))   // 前端：index.html + css/js 静态资源
 	return mux
 }

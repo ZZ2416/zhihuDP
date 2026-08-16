@@ -70,6 +70,23 @@
       <div id="kline-chart"></div>
     </div>
 
+    <!-- 二期：与看山对话（K 线面板下方，独立对话区） -->
+    <div class="card hidden" id="chat-card">
+      <div class="chat-head">
+        <img class="chat-avatar" src="/pic/kanshan.jpg" alt="看山">
+        <div class="chat-title-box">
+          <div class="section-title" style="margin:0">与看山对话</div>
+          <div class="chat-sub">基于本次分析结果继续提问 · 看山是信息工具，不提供买卖建议</div>
+        </div>
+        <button class="chat-clear" onclick="clearChat()">清空</button>
+      </div>
+      <div class="chat-msgs" id="chat-msgs"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="继续追问，如：情绪为什么偏空？" autocomplete="off" spellcheck="false">
+        <button id="chat-send" onclick="sendChat()">发送</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="section-title">情绪面板</div>
       <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
@@ -161,6 +178,7 @@
 <script src="/js/kline.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/app.js"></script>
+<script src="/js/chat.js"></script>
 <script src="/js/keys.js"></script>
 </body>
 </html>

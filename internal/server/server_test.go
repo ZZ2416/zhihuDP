@@ -56,13 +56,25 @@ func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []b
 
 func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
 
+// fakeChatProvider 二期对话桩：直接回一段 delta
+type fakeChatProvider struct{}
+
+func (fakeChatProvider) Chat(_ context.Context, _, _, _ string, sink func(types.Event) error) error {
+	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "看山觉得…"}})
+}
+
+func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ *types.SentimentResult, _ string) {
+}
+
+func (fakeChatProvider) Reset(_ string) {}
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
 		"index.html":    {Data: []byte("<html>test</html>")},
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
