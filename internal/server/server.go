@@ -1,5 +1,5 @@
 // Package server HTTP 层：Router + Handler
-// 依赖 service 接口（Analyzer/Resolver），不依赖具体实现，便于 httptest 测试与替换。
+// 依赖 service 接口（Analyzer/Resolver/KlineProvider），不依赖具体实现，便于 httptest 测试与替换。
 package server
 
 import (
@@ -19,22 +19,34 @@ type Resolver interface {
 	Resolve(ctx context.Context, q string) (*types.StockInfo, error)
 }
 
+// KlineProvider 行情服务接口（由 internal/kline.GetKline 实现）
+type KlineProvider interface {
+	GetKline(ctx context.Context, market, code string, days int) (*types.Kline, error)
+}
+
 // Server HTTP 层（依赖注入：实现在 cmd/server.main 组装）
 type Server struct {
-	analyzer  Analyzer
-	resolver  Resolver
-	indexHTML []byte // 前端（go:embed，由入口注入）
+	analyzer      Analyzer
+	resolver      Resolver
+	klineProvider KlineProvider
+	indexHTML     []byte // 前端（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, indexHTML []byte) *Server {
-	return &Server{analyzer: analyzer, resolver: resolver, indexHTML: indexHTML}
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, indexHTML []byte) *Server {
+	return &Server{
+		analyzer:      analyzer,
+		resolver:      resolver,
+		klineProvider: klineProvider,
+		indexHTML:     indexHTML,
+	}
 }
 
 // Routes 注册路由（Router 层）
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/resolve", s.handleResolve) // 探针：股票识别（无需密钥）
+	mux.HandleFunc("GET /api/kline", s.handleKline)     // 行情：报价 + 日K线
 	mux.HandleFunc("POST /api/ask", s.handleAsk)        // SSE：完整分析
 	mux.HandleFunc("GET /", s.handleIndex)              // 前端入口
 	return mux

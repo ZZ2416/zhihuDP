@@ -12,6 +12,7 @@ import (
 
 	"zhihudp/internal/agent"
 	"zhihudp/internal/config"
+	"zhihudp/internal/kline"
 	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
@@ -48,6 +49,7 @@ func main() {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
 		}),
 		resolverFunc(stock.Resolve),
+		klineProviderFunc(kline.GetKline),
 		indexHTML,
 	)
 
@@ -73,9 +75,17 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 
 // 编译期断言：适配器满足 server 接口（house style）
 var (
-	_ server.Analyzer = (analyzerFunc)(nil)
-	_ server.Resolver = (resolverFunc)(nil)
+	_ server.Analyzer      = (analyzerFunc)(nil)
+	_ server.Resolver      = (resolverFunc)(nil)
+	_ server.KlineProvider = (klineProviderFunc)(nil)
 )
+
+// klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
+type klineProviderFunc func(ctx context.Context, market, code string, days int) (*types.Kline, error)
+
+func (f klineProviderFunc) GetKline(ctx context.Context, market, code string, days int) (*types.Kline, error) {
+	return f(ctx, market, code, days)
+}
 
 // buildDeps 组装 agent 依赖（业务层接线点）
 func buildDeps(cfg *config.Config) agent.Deps {

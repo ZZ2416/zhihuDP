@@ -107,6 +107,16 @@
   .stock-head .market { font-size: 12px; background: var(--accent-weak); color: var(--accent); padding: 2px 10px; border-radius: 12px; }
   .stock-head .fresh { margin-left: auto; font-size: 12px; color: var(--faint); }
 
+  /* 实时行情 */
+  .q-row { display: flex; flex-direction: column; gap: 10px; }
+  .q-price { font-size: 30px; font-weight: 800; }
+  .q-change { margin-left: 10px; font-size: 15px; font-weight: 600; }
+  .q-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 2px; }
+  .q-cell { background: var(--card-soft); border-radius: 8px; padding: 8px 10px; }
+  .q-cell .k { font-size: 11px; color: var(--faint); }
+  .q-cell .v { font-size: 13px; font-weight: 600; margin-top: 2px; }
+  @media (max-width: 560px) { .q-grid { grid-template-columns: repeat(3, 1fr); } }
+
   .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
   .section-title::before { content: ""; width: 4px; height: 15px; border-radius: 2px; background: var(--accent); }
 
@@ -230,6 +240,12 @@
       <div class="stock-head" id="stock-head"></div>
     </div>
 
+    <div class="card hidden" id="quote-card">
+      <div class="section-title">实时行情</div>
+      <div id="quote-body"></div>
+      <div id="kline-chart"></div>
+    </div>
+
     <div class="card">
       <div class="section-title">情绪面板</div>
       <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
@@ -328,6 +344,9 @@ async function doSearch() {
   hideSuggest();
 
   $('stock-head').innerHTML = '';
+  $('quote-card').classList.add('hidden');
+  $('quote-body').innerHTML = '';
+  $('kline-chart').innerHTML = '';
   $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
   $('analysis').innerHTML = '';
   analysisText = '';
@@ -388,12 +407,133 @@ function handleEvent(event, data) {
         '<span class="code">' + esc(d.code || '') + '</span>' +
         '<span class="market">' + esc(d.market || '') + '</span>' +
         '<span class="fresh">实时检索</span>';
+      fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
       break;
     case 'sentiment': renderSentiment(d); break;
     case 'delta': appendDelta(d.text || ''); break;
     case 'error': showError(d.message || '发生错误'); break;
     case 'done': break;
   }
+}
+
+/* ===== 行情（报价 + 日K蜡烛图；异步拉取，不影响 SSE 流） ===== */
+async function fetchKline(code, market) {
+  try {
+    const resp = await fetch('/api/kline?code=' + encodeURIComponent(code) +
+      '&market=' + encodeURIComponent(market || '沪A') + '&days=60');
+    if (!resp.ok) { renderKlineError(); return; }
+    const data = await resp.json();
+    if (!data || !data.quote) { renderKlineError(); return; }
+    renderQuote(data.quote);
+    renderKline(data.candles || []);
+  } catch (e) { renderKlineError(); }
+}
+
+function renderQuote(q) {
+  const up = (q.change || 0) >= 0;
+  const color = up ? 'var(--bull)' : 'var(--bear)';
+  const sign = up ? '+' : '';
+  const vol = (q.volume || 0) >= 10000 ? (q.volume / 10000).toFixed(2) + '万手' : (q.volume || 0) + '手';
+  $('quote-body').innerHTML =
+    '<div class="q-row">' +
+      '<div>' +
+        '<span class="q-price" style="color:' + color + '">' + (q.price || 0).toFixed(2) + '</span>' +
+        '<span class="q-change" style="color:' + color + '">' + sign + (q.change || 0).toFixed(2) + '  ' + sign + (q.change_pct || 0).toFixed(2) + '%</span>' +
+      '</div>' +
+      '<div class="q-grid">' +
+        qCell('今开', (q.open || 0).toFixed(2)) +
+        qCell('最高', (q.high || 0).toFixed(2)) +
+        qCell('最低', (q.low || 0).toFixed(2)) +
+        qCell('昨收', (q.prev_close || 0).toFixed(2)) +
+        qCell('成交量', vol) +
+      '</div>' +
+    '</div>';
+  $('quote-card').classList.remove('hidden');
+}
+function qCell(k, v) {
+  return '<div class="q-cell"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+}
+
+function renderKline(candles) {
+  const el = $('kline-chart');
+  if (!candles || !candles.length) {
+    el.innerHTML = '<div class="degraded" style="margin-top:12px">暂无行情数据</div>';
+    return;
+  }
+  const n = candles.length;
+  const W = 860, H = 340, padL = 58, padR = 12, padT = 18;
+  const volH = 60, dateH = 26;
+  const priceH = H - volH - dateH - padT;
+  const plotW = W - padL - padR;
+  const cw = plotW / n;
+  const bodyW = Math.max(1, cw * 0.6);
+
+  let min = Infinity, max = -Infinity, maxVol = 0;
+  for (const c of candles) {
+    if (c.low < min) min = c.low;
+    if (c.high > max) max = c.high;
+    if (c.volume > maxVol) maxVol = c.volume;
+  }
+  const pad = (max - min) * 0.05 || 1;
+  min -= pad; max += pad;
+  const y = v => padT + (max - v) / (max - min) * priceH;
+  const x = i => padL + i * cw + cw / 2;
+  const ma = k => {
+    const pts = [];
+    for (let i = k - 1; i < n; i++) {
+      let s = 0;
+      for (let j = i - k + 1; j <= i; j++) s += candles[j].close;
+      pts.push(x(i).toFixed(1) + ',' + y(s / k).toFixed(1));
+    }
+    return pts.join(' ');
+  };
+
+  let svg = '';
+  // 网格 + 价格刻度
+  const gl = 4;
+  for (let i = 0; i <= gl; i++) {
+    const v = min + (max - min) * i / gl, yy = y(v);
+    svg += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--border)" stroke-width="1"/>';
+    svg += '<text x="' + (padL - 6) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10" fill="var(--faint)">' + v.toFixed(2) + '</text>';
+  }
+  // 蜡烛（红涨绿跌）
+  for (let i = 0; i < n; i++) {
+    const c = candles[i];
+    const up = c.close >= c.open;
+    const color = up ? 'var(--bull)' : 'var(--bear)';
+    const cx = x(i);
+    svg += '<line x1="' + cx + '" y1="' + y(c.high) + '" x2="' + cx + '" y2="' + y(c.low) + '" stroke="' + color + '" stroke-width="1"/>';
+    const yo = y(c.open), yc = y(c.close);
+    const top = Math.min(yo, yc), h = Math.max(1, Math.abs(yo - yc));
+    svg += '<rect x="' + (cx - bodyW / 2) + '" y="' + top + '" width="' + bodyW + '" height="' + h + '" fill="' + color + '"/>';
+  }
+  // 均线 MA5/10/20
+  svg += '<polyline points="' + ma(5) + '" fill="none" stroke="#f7b731" stroke-width="1.4"/>';
+  svg += '<polyline points="' + ma(10) + '" fill="none" stroke="#3867d6" stroke-width="1.4"/>';
+  svg += '<polyline points="' + ma(20) + '" fill="none" stroke="#8854d0" stroke-width="1.4"/>';
+  // 成交量
+  const volTop = H - dateH;
+  svg += '<line x1="' + padL + '" y1="' + volTop + '" x2="' + (W - padR) + '" y2="' + volTop + '" stroke="var(--border)"/>';
+  for (let i = 0; i < n; i++) {
+    const c = candles[i];
+    const up = c.close >= c.open;
+    const color = up ? 'var(--bull)' : 'var(--bear)';
+    const h = Math.max(1, c.volume / maxVol * volH);
+    svg += '<rect x="' + (x(i) - bodyW / 2) + '" y="' + (volTop - h) + '" width="' + bodyW + '" height="' + h + '" fill="' + color + '" opacity="0.5"/>';
+  }
+  // 日期刻度
+  const idxs = [0, Math.floor(n / 2), n - 1];
+  for (const i of idxs) {
+    svg += '<text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="var(--faint)">' + candles[i].date.slice(5) + '</text>';
+  }
+  // 图例
+  svg += '<text x="' + (W - padR) + '" y="' + (padT + 10) + '" text-anchor="end" font-size="10" fill="var(--faint)">MA5 橙 · MA10 蓝 · MA20 紫</text>';
+
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' + svg + '</svg>';
+}
+
+function renderKlineError() {
+  $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">行情数据加载失败，请稍后重试</div>';
 }
 
 /* ===== 情绪面板 ===== */

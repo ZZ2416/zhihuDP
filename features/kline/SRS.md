@@ -99,30 +99,25 @@
 
 | 类别 | 要求 |
 |---|---|
-| 性能 | `/api/kline` 端到端响应 < 1s（实测东财接口 ~300ms）；K线请求与 SSE 分析流并行（前端异步拉取，不阻塞） |
+| 性能 | `/api/kline` 端到端响应 < 1s（实测腾讯接口 ~350ms）；K线请求与 SSE 分析流并行（前端异步拉取，不阻塞） |
 | 可靠性 | K线接口失败不 panic、不影响主流程；超时 5s |
 | 可维护性 | 行情客户端独立为 dao 层包（`internal/kline`），与情绪链路解耦 |
 | 安全 | 沿用现有：无新增密钥、日志脱敏、无敏感数据 |
 
-## 5. 数据需求（东财接口契约，已实测）
+## 5. 数据需求（腾讯接口契约，已实测）
 
-### 5.1 日 K 线
-
-```
-GET https://push2his.eastmoney.com/api/qt/stock/kline/get
-  ?secid={mkt}.{code}&klt=101&fqt=1&fields1=f1,f2,f3,f4,f5,f6
-  &fields2=f51,f52,f53,f54,f55,f56,f57,f58&end=20500101&lmt={days}
-```
-- `secid` 市场前缀：沪A=1、深A=0、北A=0
-- `klines[]` 格式：`日期,开盘,收盘,最高,最低,成交量(手),成交额,振幅%`
-- 响应含 `preKPrice`（昨收）、`decimal`（小数位）、`name`
-
-### 5.2 实时报价
+### 5.1 日 K 线 + 实时报价（单请求）
 
 ```
-GET https://push2.eastmoney.com/api/qt/stock/get?secid={mkt}.{code}&fields=f43,f44,f45,f46,f47,f48,f60,f169,f170,f171
+GET https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={mkt}{code},day,,,{days},qfq
 ```
-- `f43`=最新价(÷100)、`f44`=最高、`f45`=最低、`f46`=今开、`f47`=成交量、`f60`=昨收、`f169`=涨跌额(÷100)、`f170`=涨跌幅%(÷100)、`f171`=振幅%(÷100)
+- `mkt` 前缀：沪A=sh、深A=sz、北A=bj；`qfq` 前复权
+- 响应 `data.{mkt}{code}.qfqday`：`[[日期,开盘,收盘,最高,最低,成交量(手)], ...]`
+  - ⚠️ **除权除息日的数据行末尾带分红对象**（如 `{"FHcontent":"10派280.242元"}`），解析时需宽容处理（RawMessage 取前 6 字段）
+- 响应 `data.{mkt}{code}.qt.{mkt}{code}`：报价数组，固定索引
+  - `[3]`最新价、`[4]`昨收、`[5]`今开、`[6]`成交量(手)、`[31]`涨跌额、`[32]`涨跌幅%、`[33]`最高、`[34]`最低、`[1]`名称
+- 请求需带**浏览器 User-Agent**（Go 默认 UA 曾被服务端拒绝）
+- 选型说明：原拟东财接口，实测密集请求后被限流（持续 EOF），腾讯单请求稳定，故选用腾讯
 
 ## 6. 边界与异常处理
 
@@ -139,7 +134,7 @@ GET https://push2.eastmoney.com/api/qt/stock/get?secid={mkt}.{code}&fields=f43,f
 | # | 验收项 | 通过标准 |
 |---|---|---|
 | 1 | 接口连通 | `/api/kline?code=600519&market=沪A&days=60` 返回合法 JSON（quote + 60 根 candles） |
-| 2 | 数据正确 | 报价字段与东财页面一致；K线日期连续、开收高低关系正确（高≥开收≥低） |
+| 2 | 数据正确 | 报价字段与腾讯行情页面一致；K线日期连续、开收高低关系正确（高≥开收≥低） |
 | 3 | 前端渲染 | 浏览器展示蜡烛图 + 成交量 + 股价卡，明暗主题均正常 |
 | 4 | 降级 | 断网/非法代码时情绪面板与 AI 分析不受影响 |
 | 5 | 合规 | `internal/agent`、`internal/sentiment` 无行情数据引用（代码评审） |

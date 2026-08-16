@@ -26,8 +26,19 @@ func (fakeAnalyzer) RunAnalysis(_ context.Context, _ string, sink func(types.Eve
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "ok"}})
 }
 
+type fakeKlineProvider struct{}
+
+func (fakeKlineProvider) GetKline(_ context.Context, market, code string, days int) (*types.Kline, error) {
+	return &types.Kline{
+		Quote: types.Quote{Code: code, Name: "测试股", Price: 10.5, ChangePct: 1.2},
+		Candles: []types.Candle{
+			{Date: "2026-08-12", Open: 10, Close: 10.5, High: 10.8, Low: 9.9, Volume: 100},
+		},
+	}, nil
+}
+
 func newTestServer() *Server {
-	return New(fakeAnalyzer{}, fakeResolver{}, []byte("<html>test</html>"))
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, []byte("<html>test</html>"))
 }
 
 func TestResolveHandler(t *testing.T) {

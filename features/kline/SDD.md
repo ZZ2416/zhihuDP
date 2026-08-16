@@ -22,7 +22,7 @@ internal/server（HTTP 层）
   ├─ handler_kline.go   GET /api/kline（新增）
   └─ KlineProvider 接口（消费方定义）
         ↑ 实现
-internal/kline（dao 层，新增）—— 东财 K线 + 实时报价客户端
+internal/kline（dao 层，新增）—— 腾讯 K线 + 实时报价客户端（单请求）
 internal/types（共享）—— Candle / Quote / Kline 结构
 internal/web/index.html（前端）—— 股价卡 + SVG 蜡烛图渲染
 ```
@@ -33,7 +33,7 @@ internal/web/index.html（前端）—— 股价卡 + SVG 蜡烛图渲染
 用户搜索 → POST /api/ask（SSE）→ 前端收到 stock 事件（code/market）
               │
               ├─（异步，并行）GET /api/kline?code=&market=&days=
-              │     → internal/kline.GetKline → 东财接口 → JSON
+              │     → internal/kline.GetKline → 腾讯接口（单请求） → JSON
               │     → 前端渲染股价卡 + 蜡烛图（失败则降级卡片）
               └─（继续消费 SSE）sentiment / delta → 情绪面板 + AI 分析
 ```
@@ -95,7 +95,7 @@ type Kline struct {
   "candles": [ {"date":"2026-08-12","open":1346.50,"close":1343.00,"high":1356.88,"low":1332.51,"volume":35060}, ... ] }
 ```
 
-**错误**：400（参数非法）/ 404（无数据，可返回空 candles 代替）/ 502（东财失败，透传摘要）。
+**错误**：400（参数非法）/ 404（无数据，可返回空 candles 代替）/ 502（腾讯失败，透传摘要）。
 
 ## 5. 时序图
 
@@ -127,14 +127,14 @@ end
 
 **`func GetKline(ctx context.Context, market, code string, days int) (*types.Kline, error)`**
 - 类型：包级函数；调用方：`internal/server`（经 KlineProvider 接口）
-- 职责：并行拉取东财 K线 + 实时报价，组装 `types.Kline`
+- 职责：请求腾讯接口一次，同时返回 K线 + 实时报价，组装 `types.Kline`
 - 入参：`market`（沪A/深A/北A/sh/sz/bj）、`code`、`days`
 - 边界：
   - secid 映射：沪A→1、深A→0、北A→0；market 非法 → 错误
-  - days clamp [10,250]；东财 `lmt` 取 days
-  - 东财非 200 / JSON 解析失败 → 明确错误
+  - days clamp [10,250]
+  - 腾讯非 200 / JSON 解析失败 → 明确错误；除权除息行的分红对象需宽容解析（RawMessage 取前 6 字段）
   - `klines` 为空 → 返回空 `Candles`（非 nil，前端走降级）
-- 关键约束：两个东财请求**并行**（goroutine + errgroup 或 WaitGroup），单请求超时 5s；字段 `f43/f169/f170` 等 ÷100 换算
+- 关键约束：单请求超时 5s；带浏览器 UA（Go 默认 UA 曾被拒）；报价取 qt 数组固定索引（[3]最新价 [4]昨收 [31]涨跌 [32]涨跌% [33]最高 [34]最低）
 
 **`func secidOf(market string) (string, error)`**：市场 → secid 前缀（内部函数）
 
@@ -175,24 +175,24 @@ end
 
 | 场景 | 处理 |
 |---|---|
-| 停牌/新股 | 东财 klines 为空 → 空数组 → 前端降级卡片 |
+| 停牌/新股 | 腾讯 klines 为空 → 空数组 → 前端降级卡片 |
 | 北交所 | market=北A → secid `0` 前缀（需实测验证） |
 | days 越界 | clamp [10,250] |
-| 东财超时/失败 | 502 + 前端降级卡片（不影响情绪/AI） |
+| 腾讯超时/失败 | 502 + 前端降级卡片（不影响情绪/AI） |
 | 并发 | K线请求与 SSE 并行（前端异步），服务端无共享状态 |
 
 ## 9. 上线三板斧（demo 版）
 
 ### 监控
 - 结构化日志：`[kline] code=600519 market=沪A days=60 耗时=XXXms candles=60`
-- 失败计数：东财错误摘要
+- 失败计数：腾讯错误摘要
 
 ### 灰度
 - 无用户体系；前端渐进增强（K线失败降级卡片），天然可回退
 
 ### 回滚
 - 无状态无 DB；接口与前端均独立，可单独回退
-- 数据源单点：东财失败自动降级；如需切换可改 `internal/kline`（单点）
+- 数据源单点：腾讯失败自动降级；如需切换可改 `internal/kline`（单点）
 
 ## 10. 待确认问题
 
