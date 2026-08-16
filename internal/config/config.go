@@ -30,6 +30,7 @@ type ZhihuConfig struct {
 	AccessSecret   string `yaml:"access_secret"`    // 必填：知乎 Bearer token
 	OpenAPIBaseURL string `yaml:"openapi_base_url"` // 默认 https://developer.zhihu.com
 	SearchURL      string `yaml:"zhihu_search_url"` // 可选：完整 endpoint，优先级最高
+	KnowledgeBaseID string `yaml:"knowledge_base_id"` // 可选：知识库搜索用（股票讨论知识库）
 }
 
 // DeepSeekConfig DeepSeek 模型配置

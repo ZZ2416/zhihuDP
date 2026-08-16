@@ -149,6 +149,8 @@ async function loadHomeHot() {
 }
 
 function retryHot() {
+  loadKnowledge();
+
   const label = $('hot-stocks-label'), back = $('hot-stocks-back');
   if (label) label.textContent = ''; if (back) back.classList.add('hidden');
   loadHomeHot();
@@ -165,6 +167,7 @@ function hotSearch(name) {
 window.addEventListener('load', () => {
   $('stock-input').focus();
   loadHomeHot();
+  loadKnowledge();
 });
 
 /* ---- 板块点击 → 成分股（复用热门股票卡片） ---- */
@@ -195,4 +198,10 @@ function setHotContext(isSector, name) {
     label.textContent = '';
     back.classList.add('hidden');
   }
+}
+
+/* ---- 股票讨论（知识库搜索）加载 ---- */
+async function loadKnowledge() {
+  const items = await apiKnowledge('股票', 10).catch(() => null);
+  if (items && items.length) renderKnowledge(items);
 }

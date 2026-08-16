@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：主栏目股票讨论方形卡片（knowledge_search）+ 热门股票移侧边栏
+
+**knowledge_search 打通（RAG 知识库）**：
+- 端点 `POST /api/v1/knowledge/search`，schema 由用户提供：`{Query, KnowledgeBaseIDs[], RecallScopes[], Limit}`
+- 知识库：「股票投资方法论」（ID 7520243014858214186，267 条内容，公开）
+- `zhihu.Client.KnowledgeSearch` + `GET /api/knowledge?q=股票&limit=` + `KnowledgeProvider` 接口
+
+**布局重构**：
+- **主栏目**：新增「**股票讨论**」方形卡片网格（DocName 标题 + 内容摘要 + 知乎原文链接，hover 上浮）
+- **侧边栏**：热门板块 + **热门股票**（从主栏目移入）
+
+**验证**：/api/knowledge 返回真实讨论（市场轮动/红利股/速胜...）✅、首页结构 ✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：顶栏看山 banner 背景
 
 用户提供 `pic/fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg`（800×400 横版）→ `web/pic/kanshan-header.jpg`：

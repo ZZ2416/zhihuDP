@@ -51,6 +51,9 @@ func main() {
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
 		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
+		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
+			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
+		}),
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -80,7 +83,8 @@ var (
 	_ server.Resolver      = (resolverFunc)(nil)
 	_ server.KlineProvider = (klineProviderFunc)(nil)
 	_ server.NewsProvider  = (newsProviderFunc)(nil)
-	_ server.HotProvider = hotProviderFunc{}
+	_ server.HotProvider   = hotProviderFunc{}
+	_ server.KnowledgeProvider = (knowledgeProviderFunc)(nil)
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -95,6 +99,13 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
+}
+
+// knowledgeProviderFunc 适配器：函数实现 → server.KnowledgeProvider 接口
+type knowledgeProviderFunc func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error)
+
+func (f knowledgeProviderFunc) KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
+	return f(ctx, query, kbIDs, limit)
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口

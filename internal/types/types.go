@@ -99,3 +99,10 @@ type HotItem struct {
 	Type      string  `json:"type"`       // stock / sector
 }
 
+
+// KnowledgeItem 知识库搜索结果条目（GET /api/knowledge 返回体元素）
+type KnowledgeItem struct {
+	Content  []string `json:"content"`  // 命中的内容片段
+	DocName  string   `json:"doc_name"` // 文档名（讨论标题）
+	OriginUrl string  `json:"origin_url"` // 知乎原文链接
+}

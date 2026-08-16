@@ -163,3 +163,21 @@ function showHotDegraded(type) {
     '<a style="margin-left:8px;cursor:pointer" onclick="retryHot()">重试</a></div>';
   $(card).classList.remove('hidden');
 }
+
+/* ---- 股票讨论（知识库搜索，方形卡片） ---- */
+function renderKnowledge(items) {
+  const el = $('knowledge');
+  if (!items || !items.length) { $('knowledge-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const title = it.doc_name || '知乎讨论';
+    const excerpt = (it.content && it.content[0]) ? it.content[0].slice(0, 120) : '';
+    html += '<div class="k-card">' +
+      '<div class="k-title"><a href="' + esc(it.origin_url || '#') + '" target="_blank" rel="noopener">' + esc(title) + '</a></div>' +
+      '<div class="k-excerpt">' + esc(excerpt) + '</div>' +
+      (it.origin_url ? '<a class="k-link" href="' + esc(it.origin_url) + '" target="_blank" rel="noopener">查看讨论 ↗</a>' : '') +
+      '</div>';
+  }
+  el.innerHTML = html;
+  $('knowledge-card').classList.remove('hidden');
+}
