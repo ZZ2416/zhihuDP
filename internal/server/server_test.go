@@ -51,7 +51,7 @@ func newTestServer() *Server {
 		"css/style.css":   {Data: []byte("body{}")},
 		"js/app.js":       {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeZhihuHotProvider{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -146,4 +146,11 @@ func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.Hot
 
 func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
 	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
+}
+
+
+type fakeZhihuHotProvider struct{}
+
+func (fakeZhihuHotProvider) HotList(_ context.Context, _ int) ([]types.ZhihuHotItem, error) {
+	return []types.ZhihuHotItem{{Title: "测试热榜", Url: "https://www.zhihu.com/", Summary: "摘要"}}, nil
 }

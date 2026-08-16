@@ -137,14 +137,24 @@ $('stock-input').addEventListener('keydown', e => {
 });
 window.addEventListener('load', () => $('stock-input').focus());
 
-/* ---- 首页热门加载（ticker + 板块/股票卡片，失败静默） ---- */
+/* ---- 首页热门加载：知乎热榜（主）+ 股票/板块（辅助，失败友好降级） ---- */
 async function loadHomeHot() {
-  try {
-    const [stocks, sectors] = await Promise.all([apiHot('stock', 10), apiHot('sector', 8)]);
-    renderTicker(stocks || []);
-    renderHotStocks(stocks || []);
-    renderHotSectors(sectors || []);
-  } catch (e) { /* 静默降级：热门不阻塞搜索 */ }
+  // 知乎热榜（主数据源，每 3h 更新；失败静默隐藏）
+  apiZhihuHot(10).then(items => { if (items) renderZhihuHot(items); }).catch(() => {});
+
+  // 股票/板块（辅助数据，限流时友好降级 + 重试）
+  const stocks = await apiHot('stock', 10).catch(() => null);
+  const sectors = await apiHot('sector', 8).catch(() => null);
+  if (stocks && stocks.length) { renderTicker(stocks); renderHotStocks(stocks); }
+  else { renderTicker([]); showHotDegraded('stock'); }
+  if (sectors && sectors.length) { renderHotSectors(sectors); }
+  else { showHotDegraded('sector'); }
+}
+
+function retryHot() {
+  const label = $('hot-stocks-label'), back = $('hot-stocks-back');
+  if (label) label.textContent = ''; if (back) back.classList.add('hidden');
+  loadHomeHot();
 }
 
 /* 点击热门股票 → 直接查询 */

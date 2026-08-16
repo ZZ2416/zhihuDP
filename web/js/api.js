@@ -33,3 +33,9 @@ async function apiHot(type, count, code) {
   if (!resp.ok) return null;
   return resp.json();
 }
+
+async function apiZhihuHot(count) {
+  const resp = await fetch('/api/zhihu-hot?count=' + (count || 10));
+  if (!resp.ok) return null;
+  return resp.json();
+}

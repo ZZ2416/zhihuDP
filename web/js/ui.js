@@ -149,3 +149,30 @@ function renderTicker(items) {
   // 双份内容实现无缝滚动
   el.innerHTML = '<div class="ticker-track">' + group + group + '</div>';
 }
+
+/* ---- 知乎热榜（主数据源） ---- */
+function renderZhihuHot(items) {
+  const el = $('zhihu-hot');
+  if (!items || !items.length) { $('zhihu-hot-card').classList.add('hidden'); return; }
+  let html = '<div class="news-list">';
+  items.forEach((it, i) => {
+    html += '<div class="zhihu-hot-item">' +
+      '<span class="rank">' + (i + 1) + '</span>' +
+      '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '') + '</a>' +
+      '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+  $('zhihu-hot-card').classList.remove('hidden');
+}
+
+/* ---- 热门辅助数据：友好降级 ---- */
+function showHotDegraded(type) {
+  const id = type === 'stock' ? 'hot-stocks' : 'hot-sectors';
+  const card = type === 'stock' ? 'hot-stocks-card' : 'hot-sectors-card';
+  $('hot-stocks-label') && ($('hot-stocks-label').textContent = '');
+  $('hot-stocks-back') && $('hot-stocks-back').classList.add('hidden');
+  $(id).innerHTML = '<div class="degraded" style="margin-top:8px">热门行情数据暂时不可用，请稍后重试。' +
+    '<a style="margin-left:8px;cursor:pointer" onclick="retryHot()">重试</a></div>';
+  $(card).classList.remove('hidden');
+}

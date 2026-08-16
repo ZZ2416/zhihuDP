@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"zhihudp/internal/config"
+	"zhihudp/internal/types"
 )
 
 // SearchResponse 知乎 zhihu_search 响应（字段名以实际 JSON 为准，PascalCase）
@@ -102,6 +103,82 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 		sr.Data.Items = []Item{}
 	}
 	return &sr, nil
+}
+
+// HotList 知乎热榜（每 3h 更新，主数据源热门数据）
+func (c *Client) HotList(ctx context.Context, count int) ([]types.ZhihuHotItem, error) {
+	if c.cfg.AccessSecret == "" {
+		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
+	}
+	if count < 1 {
+		count = 1
+	}
+	if count > 30 {
+		count = 30
+	}
+
+	base := strings.TrimRight(c.cfg.OpenAPIBaseURL, "/")
+	if base == "" {
+		base = "https://developer.zhihu.com"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/v1/content/hot_list", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.cfg.AccessSecret)
+	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("调用 hot_list 失败: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取 hot_list 响应失败: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("hot_list 非 2xx: %d, body: %s", resp.StatusCode, truncate(string(body), 500))
+	}
+
+	var sr struct {
+		Code    int    `json:"Code"`
+		Message string `json:"Message"`
+		Data    struct {
+			Total int `json:"Total"`
+			Items []struct {
+				Title        string `json:"Title"`
+				Url          string `json:"Url"`
+				Summary      string `json:"Summary"`
+				ThumbnailUrl string `json:"ThumbnailUrl"`
+			} `json:"Items"`
+		} `json:"Data"`
+	}
+	if err := json.Unmarshal(body, &sr); err != nil {
+		return nil, fmt.Errorf("hot_list 响应解析失败: %w", err)
+	}
+	if sr.Code != 0 {
+		return nil, fmt.Errorf("hot_list Code=%d Message=%s", sr.Code, sr.Message)
+	}
+
+	items := make([]types.ZhihuHotItem, 0, len(sr.Data.Items))
+	for _, it := range sr.Data.Items {
+		if it.Title == "" {
+			continue
+		}
+		items = append(items, types.ZhihuHotItem{
+			Title:     it.Title,
+			Url:       it.Url,
+			Summary:   truncate(it.Summary, 120),
+			Thumbnail: it.ThumbnailUrl,
+		})
+	}
+	if len(items) > count {
+		items = items[:count]
+	}
+	return items, nil
 }
 
 // endpoint 端点解析优先级：完整 URL > BaseURL + 路径 > 默认

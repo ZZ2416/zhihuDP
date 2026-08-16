@@ -98,3 +98,11 @@ type HotItem struct {
 	ChangePct float64 `json:"change_pct"` // 涨跌幅 %
 	Type      string  `json:"type"`       // stock / sector
 }
+
+// ZhihuHotItem 知乎热榜条目（GET /api/zhihu-hot 返回体元素）
+type ZhihuHotItem struct {
+	Title     string `json:"title"`
+	Url       string `json:"url"`
+	Summary   string `json:"summary"`
+	Thumbnail string `json:"thumbnail"`
+}

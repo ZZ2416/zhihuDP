@@ -41,7 +41,8 @@ func main() {
 	}
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
-	deps := buildDeps(cfg)
+	zhClient := zhihu.New(cfg.Zhihu)
+	deps := buildDeps(cfg, zhClient)
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -50,6 +51,9 @@ func main() {
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
 		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
+		zhihuHotProviderFunc(func(ctx context.Context, count int) ([]types.ZhihuHotItem, error) {
+			return zhClient.HotList(ctx, count)
+		}),
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -79,7 +83,8 @@ var (
 	_ server.Resolver      = (resolverFunc)(nil)
 	_ server.KlineProvider = (klineProviderFunc)(nil)
 	_ server.NewsProvider  = (newsProviderFunc)(nil)
-	_ server.HotProvider   = hotProviderFunc{}
+	_ server.HotProvider      = hotProviderFunc{}
+	_ server.ZhihuHotProvider = (zhihuHotProviderFunc)(nil)
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -94,6 +99,13 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
+}
+
+// zhihuHotProviderFunc 适配器：函数实现 → server.ZhihuHotProvider 接口
+type zhihuHotProviderFunc func(ctx context.Context, count int) ([]types.ZhihuHotItem, error)
+
+func (f zhihuHotProviderFunc) HotList(ctx context.Context, count int) ([]types.ZhihuHotItem, error) {
+	return f(ctx, count)
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口
@@ -111,8 +123,7 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 }
 
 // buildDeps 组装 agent 依赖（业务层接线点）
-func buildDeps(cfg *config.Config) agent.Deps {
-	zhClient := zhihu.New(cfg.Zhihu)
+func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
 	return agent.Deps{
 		ResolveStock: stock.Resolve,
 		AnalyzeSentiment: func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
@@ -124,7 +135,7 @@ func buildDeps(cfg *config.Config) agent.Deps {
 
 // runCLI 命令行模式：跑一次分析，打印事件
 func runCLI(query string, cfg *config.Config) {
-	deps := buildDeps(cfg)
+	deps := buildDeps(cfg, zhihu.New(cfg.Zhihu))
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {

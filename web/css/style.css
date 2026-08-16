@@ -245,3 +245,11 @@ footer p { margin: 3px 0; }
 .hot-back:hover { text-decoration: underline; }
 .hot-chip { cursor: pointer; transition: background .2s, border-color .2s; }
 .hot-chip:hover { border-color: var(--accent); background: var(--accent-weak); }
+
+/* 知乎热榜（主数据源） */
+.zhihu-hot-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--border); }
+.zhihu-hot-item:first-child { border-top: none; }
+.zhihu-hot-item .rank { font-size: 13px; font-weight: 800; color: var(--accent); width: 22px; text-align: center; flex: none; }
+.zhihu-hot-item:nth-child(-n+3) .rank { color: var(--bull); }
+.zhihu-hot-item a { font-size: 14px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zhihu-hot-item a:hover { color: var(--accent); text-decoration: none; }
