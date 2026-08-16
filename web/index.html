@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>zhihuDP · 知乎股票情绪分析</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/pic/kanshan.png">
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -31,44 +33,71 @@
   <!-- 终端行情条（ticker，首页加载热门股票） -->
   <div class="ticker-bar" id="ticker-bar"></div>
 
-  <!-- 搜索视图 -->
-  <section id="view-search" class="view">
-    <div class="hero">
-      <img class="mascot" src="/pic/kanshan.png" alt="看山" title="看山">
-      <h2>看看知乎上大家在聊什么</h2>
-      <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
-    </div>
-    <div class="card search-card">
-      <div class="search">
-        <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
-        <button id="search-btn" onclick="doSearch()">查询</button>
-      </div>
-      <div id="suggest" class="suggest hidden"></div>
-      <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
-    </div>
+  <div class="workspace">
 
-    <!-- 知乎热榜（主数据源，每 3h 更新） -->
-    <div class="card hot-card hidden" id="zhihu-hot-card">
-      <div class="section-title">知乎热榜</div>
-      <div class="zhihu-hot" id="zhihu-hot"></div>
-    </div>
+    <!-- 主列 -->
+    <div class="main-col">
 
-    <!-- 热门板块（终端面板，辅助数据） -->
-    <div class="card hot-card hidden" id="hot-sectors-card">
-      <div class="section-title">热门板块</div>
-      <div class="hot-chips" id="hot-sectors"></div>
-    </div>
+      <!-- 搜索视图 -->
+      <section id="view-search" class="view">
+        <div class="hero">
+          <svg class="mascot-scene" viewBox="0 0 320 190" aria-hidden="true">
+            <!-- 看山在看报表 -->
+            <g transform="translate(168,22)">
+              <rect width="136" height="146" rx="12" fill="var(--card)" stroke="var(--border)"/>
+              <rect x="12" y="12" width="80" height="13" rx="5" fill="var(--accent-weak)"/>
+              <rect x="12" y="33" width="112" height="2" fill="var(--border)"/>
+              <!-- K线报表（红涨绿跌） -->
+              <g stroke-linecap="round">
+                <line x1="30" y1="60" x2="30" y2="100" stroke="var(--bull)" stroke-width="2"/>
+                <rect x="27" y="62" width="6" height="30" fill="var(--bull)"/>
+                <line x1="55" y1="52" x2="55" y2="92" stroke="var(--bear)" stroke-width="2"/>
+                <rect x="52" y="70" width="6" height="18" fill="var(--bear)"/>
+                <line x1="80" y1="44" x2="80" y2="78" stroke="var(--bull)" stroke-width="2"/>
+                <rect x="77" y="48" width="6" height="26" fill="var(--bull)"/>
+                <line x1="105" y1="38" x2="105" y2="70" stroke="var(--bull)" stroke-width="2"/>
+                <rect x="102" y="42" width="6" height="24" fill="var(--bull)"/>
+              </g>
+              <polyline points="27,96 52,78 77,64 102,52" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>
+              <text x="12" y="132" font-size="9" fill="var(--faint)">近60日 · 知乎讨论热度 ↑</text>
+            </g>
+            <!-- 看山（蓝鲸） -->
+            <g transform="translate(18,66)">
+              <path d="M16 34 C7 24 4 15 7 9 c9 6 13 15 13 24z" fill="var(--accent)"/>
+              <path d="M16 34 C7 44 4 53 7 59 c9-6 13-15 13-24z" fill="var(--accent)"/>
+              <path d="M22 31 c0-12 10-21 24-21 h18 c15 0 27 9 27 21 c0 12-12 21-27 21 h-18 c-14 0-24-9-24-21z" fill="var(--accent)"/>
+              <circle cx="46" cy="26" r="4" fill="#fff"/>
+              <path d="M40 36 c3 3 8 3 11 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <path d="M33 12 c-3-5-9-6-12-5 M36 11 c-2-6-6-9-12-9 M39 14 c0-8-6-12-13-12" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/>
+            </g>
+            <!-- 对话气泡 -->
+            <g transform="translate(100,20)">
+              <rect width="86" height="30" rx="14" fill="var(--card)" stroke="var(--accent)"/>
+              <text x="43" y="19" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent)">咦，有热度！</text>
+            </g>
+          </svg>
+          <h2>看看知乎上大家在聊什么</h2>
+          <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
+        </div>
+        <div class="card search-card">
+          <div class="search">
+            <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
+            <button id="search-btn" onclick="doSearch()">查询</button>
+          </div>
+          <div id="suggest" class="suggest hidden"></div>
+          <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
+        </div>
 
-    <!-- 热门股票（终端面板） -->
-    <div class="card hot-card hidden" id="hot-stocks-card">
-      <div class="section-title">热门股票<span id="hot-stocks-label" class="hot-label"></span>
-        <a id="hot-stocks-back" class="hot-back hidden" onclick="backToHot()">← 返回热门</a></div>
-      <div class="hot-stocks" id="hot-stocks"></div>
-    </div>
-  </section>
+        <!-- 热门股票（终端面板，辅助数据） -->
+        <div class="card hot-card hidden" id="hot-stocks-card">
+          <div class="section-title">热门股票<span id="hot-stocks-label" class="hot-label"></span>
+            <a id="hot-stocks-back" class="hot-back hidden" onclick="backToHot()">← 返回热门</a></div>
+          <div class="hot-stocks" id="hot-stocks"></div>
+        </div>
+      </section>
 
-  <!-- 详情视图 -->
-  <section id="view-detail" class="view hidden">
+      <!-- 详情视图 -->
+      <section id="view-detail" class="view hidden">
     <a class="back" onclick="showSearch()">← 返回查询</a>
 
     <div class="card">
@@ -98,6 +127,22 @@
 
     <div id="error-box" class="card hidden"><div class="err-box"></div></div>
   </section>
+
+    </div><!-- /main-col -->
+
+    <!-- 侧边栏：知乎热榜导航（主数据源）+ 热门板块 -->
+    <aside class="side-col">
+      <div class="card hot-card hidden" id="zhihu-hot-card">
+        <div class="section-title">知乎热榜</div>
+        <div class="zhihu-hot" id="zhihu-hot"></div>
+      </div>
+      <div class="card hot-card hidden" id="hot-sectors-card">
+        <div class="section-title">热门板块</div>
+        <div class="hot-chips" id="hot-sectors"></div>
+      </div>
+    </aside>
+
+  </div><!-- /workspace -->
 
 </main>
 

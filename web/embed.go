@@ -3,5 +3,5 @@ package web
 
 import "embed"
 
-//go:embed index.html css js pic
+//go:embed index.html css js pic favicon.svg
 var FS embed.FS
