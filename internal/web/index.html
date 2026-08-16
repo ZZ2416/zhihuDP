@@ -259,7 +259,8 @@ function ratioRow(label, cls, val) {
 function showError(msg) {
   const box = $('error-box');
   box.classList.remove('hidden');
-  box.innerHTML = '<strong>出错了：</strong>' + esc(msg);
+  box.innerHTML = '<strong>😥 出错了，请稍后重试。</strong>' +
+    '<div style="margin-top:6px;font-size:12px;color:var(--sub)">' + esc(msg || '未知错误') + '</div>';
 }
 
 function esc(s) {

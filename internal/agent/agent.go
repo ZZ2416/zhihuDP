@@ -97,12 +97,20 @@ func RunAnalysis(ctx context.Context, query string, deps Deps, sink func(types.E
 // newChatModelAgent 组装 ADK ChatModelAgent（ReAct 循环 + 2 个自定义工具）
 func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) error) (*adk.ChatModelAgent, error) {
 	resolveTool, err := utils.InferTool("resolve_stock",
-		"将股票名称或代码解析为股票信息（代码、名称、市场）。必须先调用本工具识别股票。",
+		"将股票名称或代码解析为股票信息（代码、名称、市场）。必须先调用本工具识别股票；未找到时返回 found=false。",
 		func(ctx context.Context, req *struct {
 			Query string `json:"query" jsonschema_description:"股票名称或代码，如 茅台 / 600519"`
 		}) (string, error) {
 			info, err := deps.ResolveStock(ctx, req.Query)
 			if err != nil {
+				// 业务降级：未找到不是错误，返回结构化标记让 agent 优雅回复（避免原始错误冒泡给用户）
+				if errors.Is(err, types.ErrStockNotFound) {
+					b, _ := json.Marshal(map[string]any{
+						"found":   false,
+						"message": "未找到该股票，请检查名称或代码",
+					})
+					return string(b), nil
+				}
 				return "", err
 			}
 			_ = sink(types.Event{Type: "stock", Data: info})
@@ -139,7 +147,7 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "zhihu-stock-sentiment-agent",
 		Instruction: `你是知乎股票情绪分析助手。流程固定：
-1) 必须先调用 resolve_stock 识别股票；
+1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具；
 2) 再调用 analyze_sentiment 获取情绪数据；
 3) 基于返回的 JSON 撰写分析面板，分三段：情绪面总结、值得关注的讨论点、风险提示。
 若返回 degraded=true 或 err_msg 非空，如实说明数据不足或无法检索，不要编造。
