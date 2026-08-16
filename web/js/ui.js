@@ -164,7 +164,7 @@ function showHotDegraded(type) {
   $(card).classList.remove('hidden');
 }
 
-/* ---- 股票讨论（知识库搜索，方形卡片） ---- */
+/* ---- 讨论文章（知识库搜索，方形卡片） ---- */
 function renderKnowledge(items) {
   const el = $('knowledge');
   if (!items || !items.length) { $('knowledge-card').classList.add('hidden'); return; }
@@ -172,7 +172,7 @@ function renderKnowledge(items) {
   for (const it of items) {
     const title = it.doc_name || '知乎讨论';
     const excerpt = (it.content && it.content[0]) ? it.content[0].slice(0, 120) : '';
-    html += '<div class="k-card">' +
+    html += '<div class="k-card" data-url="' + esc(it.origin_url || '') + '">' +
       '<div class="k-title"><a href="' + esc(it.origin_url || '#') + '" target="_blank" rel="noopener">' + esc(title) + '</a></div>' +
       '<div class="k-excerpt">' + esc(excerpt) + '</div>' +
       (it.origin_url ? '<a class="k-link" href="' + esc(it.origin_url) + '" target="_blank" rel="noopener">查看讨论 ↗</a>' : '') +
@@ -180,4 +180,27 @@ function renderKnowledge(items) {
   }
   el.innerHTML = html;
   $('knowledge-card').classList.remove('hidden');
+  probeKnowledgeLinks(); // 网络可达性探测：不可达的卡片隐藏
+}
+
+/* ---- 卡片链接可用性校验（no-cors 探测） ----
+ * 跨域 fetch 受 CORS 限制无法读取状态码（知乎未开 CORS），但可区分「网络层可达/不可达」：
+ * 请求成功（任何 HTTP 响应，含 404/403）→ 保留；网络层失败（DNS/连接拒绝等）→ 隐藏。
+ * 服务端已过滤空/非法链接（handler_knowledge.go filterInvalidLinks），此处为兜底。
+ */
+function probeKnowledgeLinks() {
+  const note = document.getElementById('knowledge-note');
+  if (note) note.textContent = '';
+  let hidden = 0;
+  const cards = document.querySelectorAll('#knowledge .k-card');
+  cards.forEach(card => {
+    const url = card.getAttribute('data-url');
+    if (!url || url === '#') { card.remove(); hidden++; return; }
+    // HEAD 免下载正文；no-cors 下任何 HTTP 响应（含 404）都 resolve
+    fetch(url, { method: 'HEAD', mode: 'no-cors' })
+      .catch(() => { card.remove(); hidden++; })
+      .finally(() => {
+        if (hidden > 0 && note) note.textContent = '已隐藏 ' + hidden + ' 条链接不可用的讨论';
+      });
+  });
 }

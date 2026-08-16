@@ -164,3 +164,17 @@ type fakeKnowledgeProvider struct{}
 func (fakeKnowledgeProvider) KnowledgeSearch(_ context.Context, _ string, _ []string, _ int) ([]types.KnowledgeItem, error) {
 	return []types.KnowledgeItem{{DocName: "测试讨论", OriginUrl: "https://www.zhihu.com/", Content: []string{"股票讨论内容"}}}, nil
 }
+
+func TestFilterInvalidLinks(t *testing.T) {
+	items := []types.KnowledgeItem{
+		{DocName: "有链接", OriginUrl: "https://zhuanlan.zhihu.com/p/1993980027537229643"},
+		{DocName: "空链接", OriginUrl: ""},
+		{DocName: "非http", OriginUrl: "javascript:alert(1)"},
+		{DocName: "无host", OriginUrl: "https://"},
+		{DocName: "非法url", OriginUrl: "ht tp://x"},
+	}
+	got := filterInvalidLinks(items)
+	if len(got) != 1 || got[0].DocName != "有链接" {
+		t.Fatalf("期望仅保留合法链接条目，实际 %d 条: %+v", len(got), got)
+	}
+}

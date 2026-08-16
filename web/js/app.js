@@ -200,7 +200,7 @@ function setHotContext(isSector, name) {
   }
 }
 
-/* ---- 股票讨论（知识库搜索）加载 ---- */
+/* ---- 讨论文章（知识库搜索）加载 ---- */
 async function loadKnowledge() {
   const items = await apiKnowledge('股票', 10).catch(() => null);
   if (items && items.length) renderKnowledge(items);

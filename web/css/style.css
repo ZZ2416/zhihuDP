@@ -224,7 +224,7 @@ footer p { margin: 3px 0; }
 .hot-card { margin-top: 14px; }
 .hot-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .hot-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: 20px; background: var(--card-soft); border: 1px solid var(--border); font-size: 13px; }
-.hot-chip .hn { font-weight: 600; }
+.hot-chip .hn { font-weight: 600; color: var(--bull); } /* 板块名红色（热度强调） */
 .hot-chip .hp { font-weight: 600; }
 .hot-stocks { display: flex; flex-direction: column; }
 .hot-stock { display: flex; align-items: baseline; gap: 10px; padding: 9px 6px; border-top: 1px solid var(--border); cursor: pointer; border-radius: 6px; }
@@ -281,8 +281,9 @@ footer p { margin: 3px 0; }
 .hero { padding: 26px 0 22px; }
 .hero h2 { font-size: clamp(22px, 3.4vw, 30px); }
 
-/* 股票讨论（知识库搜索，方形卡片） */
+/* 讨论文章（知识库搜索，方形卡片） */
 .knowledge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.k-note { margin-top: 10px; font-size: 12px; color: var(--faint); }
 .k-card {
   border: 1px solid var(--border); border-radius: 12px; background: var(--card);
   padding: 14px; display: flex; flex-direction: column; gap: 8px;
