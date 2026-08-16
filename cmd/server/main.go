@@ -13,14 +13,15 @@ import (
 	"zhihudp/internal/agent"
 	"zhihudp/internal/config"
 	"zhihudp/internal/hot"
+	"zhihudp/internal/keybox"
 	"zhihudp/internal/kline"
 	"zhihudp/internal/news"
 	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
-	"zhihudp/web"
 	"zhihudp/internal/zhihu"
+	"zhihudp/web"
 )
 
 func main() {
@@ -42,6 +43,11 @@ func main() {
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
 	zhClient := zhihu.New(cfg.Zhihu)
+	kb, err := keybox.New()
+	if err != nil {
+		log.Fatalf("初始化密钥箱失败: %v", err)
+	}
+	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient}
 	deps := buildDeps(cfg, zhClient)
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
@@ -54,6 +60,7 @@ func main() {
 		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
 			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
 		}),
+		ks,     // 密钥箱：公钥下发 + 加密密钥热更新
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -79,11 +86,11 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 
 // 编译期断言：适配器满足 server 接口（house style）
 var (
-	_ server.Analyzer      = (analyzerFunc)(nil)
-	_ server.Resolver      = (resolverFunc)(nil)
-	_ server.KlineProvider = (klineProviderFunc)(nil)
-	_ server.NewsProvider  = (newsProviderFunc)(nil)
-	_ server.HotProvider   = hotProviderFunc{}
+	_ server.Analyzer          = (analyzerFunc)(nil)
+	_ server.Resolver          = (resolverFunc)(nil)
+	_ server.KlineProvider     = (klineProviderFunc)(nil)
+	_ server.NewsProvider      = (newsProviderFunc)(nil)
+	_ server.HotProvider       = hotProviderFunc{}
 	_ server.KnowledgeProvider = (knowledgeProviderFunc)(nil)
 )
 
@@ -122,6 +129,28 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 	return f.getSectorStocks(ctx, code, count)
 }
 
+// keyService 密钥箱服务：RSA 加解密 + 热更新运行中的配置（实现 server.KeyService）
+type keyService struct {
+	*keybox.KeyBox
+	cfg      *config.Config
+	zhClient *zhihu.Client
+}
+
+// UpdateKeys 应用用户提交的密钥（空值表示该项未填写，保留原密钥）
+func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
+	if deepseekKey != "" {
+		k.cfg.DeepSeek.APIKey = deepseekKey
+	}
+	if zhihuSecret != "" {
+		k.cfg.Zhihu.AccessSecret = zhihuSecret
+		k.zhClient.UpdateKeys(zhihuSecret)
+	}
+	return nil
+}
+
+// 编译期断言：keyService 满足 server.KeyService
+var _ server.KeyService = (*keyService)(nil)
+
 // buildDeps 组装 agent 依赖（业务层接线点）
 func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
 	return agent.Deps{
@@ -129,7 +158,8 @@ func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
 		AnalyzeSentiment: func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
 			return sentiment.Analyze(ctx, code, name, zhClient, cfg.DeepSeek)
 		},
-		DeepSeek: cfg.DeepSeek,
+		// getter：每次调用读取最新配置（支持弹窗热更新密钥后立即生效）
+		DeepSeek: func() config.DeepSeekConfig { return cfg.DeepSeek },
 	}
 }
 

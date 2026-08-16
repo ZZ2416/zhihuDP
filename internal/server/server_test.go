@@ -45,13 +45,24 @@ func (fakeNewsProvider) GetNews(_ context.Context, _ string, _ int) ([]types.New
 	return []types.NewsItem{{Title: "测试资讯", Url: "https://example.com", Date: "2026-08-14", Source: "东方财富"}}, nil
 }
 
+// fakeKeyService 密钥箱桩：返回固定公钥，记录解密结果
+type fakeKeyService struct{}
+
+func (fakeKeyService) PublicKeyPEM() string {
+	return "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
+}
+
+func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []byte(b64), nil }
+
+func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
-		"index.html":      {Data: []byte("<html>test</html>")},
-		"css/style.css":   {Data: []byte("body{}")},
-		"js/app.js":       {Data: []byte("// app")},
+		"index.html":    {Data: []byte("<html>test</html>")},
+		"css/style.css": {Data: []byte("body{}")},
+		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -147,9 +158,6 @@ func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.Hot
 func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
 	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
 }
-
-
-
 
 type fakeKnowledgeProvider struct{}
 

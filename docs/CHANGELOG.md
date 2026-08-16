@@ -4,6 +4,24 @@
 > 起始日期：2026-08-16
 > 说明：与 git 提交一一对应；文档链与代码均记录于此。
 
+## 2026-08-16 · ui_premiu：开屏密钥配置（KeyBox，RSA 公私钥）
+
+**改回 banner 图用途**：`fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg` 不再作顶栏背景，改为**开屏动画**主视觉；顶栏恢复纯主题色 + 毛玻璃。
+
+**开屏 + 密钥配置弹窗**（首次进入 URL）：
+- 开屏：banner 图缩放/淡入动画 2s → 淡出移除
+- 弹窗：DeepSeek API Key + 知乎 Access Secret 输入框，「跳过」/「保存我的密钥」
+- 跳过 → 使用内置默认密钥（仅服务端 config.yaml，不下发）
+- 保存 → 浏览器内 **RSA-OAEP/SHA-256（Web Crypto）** 加密后提交，服务端私钥解密热更新，立即生效
+- localStorage 记忆选择，后续访问不再弹窗；开屏每次保留
+
+**密钥箱（KeyBox）**：
+- `internal/keybox`：每次启动生成 2048 位 RSA 密钥对；私钥仅内存不持久化，重启旧公钥失效防重放
+- 端点 `GET /api/config/pubkey`（下发公钥 PEM）、`POST /api/config/keys`（加密提交，字段空=跳过）
+- 热更新链路：`zhihu.Client.UpdateKeys`（读写锁）+ `agent.Deps.DeepSeek` 改 getter（每次取最新配置）
+
+**验证**：build/vet/test 全绿 ✅、openssl 公钥加密↔Go 私钥解密回路 ✅、非法密文 400 ✅、/api/ask 默认密钥分析正常 ✅
+
 ---
 
 ## 2026-08-16 · ui_premiu：主栏目股票讨论方形卡片（knowledge_search）+ 热门股票移侧边栏

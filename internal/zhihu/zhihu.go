@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"zhihudp/internal/config"
@@ -37,9 +38,24 @@ type Item struct {
 	EditTime    int64  `json:"EditTime"`
 }
 
-// Client 知乎开放平台客户端
+// Client 知乎开放平台客户端（密钥支持热更新，线程安全）
 type Client struct {
+	mu  sync.RWMutex
 	cfg config.ZhihuConfig
+}
+
+// secret 线程安全读取 AccessSecret
+func (c *Client) secret() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.cfg.AccessSecret
+}
+
+// UpdateKeys 热更新知乎密钥（配置弹窗提交后调用）
+func (c *Client) UpdateKeys(accessSecret string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cfg.AccessSecret = accessSecret
 }
 
 // New 创建客户端
@@ -49,7 +65,7 @@ func New(cfg config.ZhihuConfig) *Client {
 
 // Search 调用 zhihu_search 开放接口
 func (c *Client) Search(ctx context.Context, query string, count int) (*SearchResponse, error) {
-	if c.cfg.AccessSecret == "" {
+	if c.secret() == "" {
 		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
 	}
 	if count < 1 {
@@ -68,7 +84,7 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 	q.Set("Query", query)
 	q.Set("Count", strconv.Itoa(count))
 	req.URL.RawQuery = q.Encode()
-	req.Header.Set("Authorization", "Bearer "+c.cfg.AccessSecret)
+	req.Header.Set("Authorization", "Bearer "+c.secret())
 	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -107,7 +123,7 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 
 // KnowledgeSearch 知识库搜索（RAG）：在指定知识库中检索内容片段
 func (c *Client) KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
-	if c.cfg.AccessSecret == "" {
+	if c.secret() == "" {
 		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
 	}
 	if query == "" {
@@ -136,7 +152,7 @@ func (c *Client) KnowledgeSearch(ctx context.Context, query string, kbIDs []stri
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.cfg.AccessSecret)
+	req.Header.Set("Authorization", "Bearer "+c.secret())
 	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -159,10 +175,10 @@ func (c *Client) KnowledgeSearch(ctx context.Context, query string, kbIDs []stri
 		Message string `json:"Message"`
 		Data    struct {
 			Items []struct {
-				Content          []string `json:"Content"`
-				DocName          string   `json:"DocName"`
-				RecallContentID  string   `json:"RecallContentID"`
-				OriginUrl        string   `json:"OriginUrl"`
+				Content         []string `json:"Content"`
+				DocName         string   `json:"DocName"`
+				RecallContentID string   `json:"RecallContentID"`
+				OriginUrl       string   `json:"OriginUrl"`
 			} `json:"Items"`
 		} `json:"Data"`
 	}

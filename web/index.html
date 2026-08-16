@@ -118,6 +118,36 @@
   <p>参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。</p>
 </footer>
 
+<!-- 开屏动画（banner 看山图） -->
+<div id="splash" aria-hidden="true">
+  <img class="splash-img" src="/pic/kanshan-header.jpg" alt="看山">
+  <div class="splash-title">知 乎 大 盘</div>
+</div>
+
+<!-- 密钥配置弹窗：首次进入引导用户配置自己的 DeepSeek / 知乎密钥，可跳过用默认 -->
+<div id="key-modal-mask" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
+  <div id="key-modal">
+    <h3 id="key-modal-title">🔑 配置你的密钥</h3>
+    <div class="modal-desc">
+      填入你自己的 <b>DeepSeek API Key</b> 与 <b>知乎三方 API Key</b>，数据仅由你本机使用。
+      密钥在浏览器内用 <b>RSA 公钥加密</b> 后传输，服务端私钥解密，明文不落日志。
+      不填则点击「跳过」，使用内置默认密钥。
+    </div>
+    <label for="key-deepseek">DeepSeek API Key（可留空）</label>
+    <input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+    <label for="key-zhihu">知乎三方 API Key / Access Secret（可留空）</label>
+    <input id="key-zhihu" type="password" placeholder="access secret" autocomplete="off" spellcheck="false">
+    <div class="key-actions">
+      <button class="btn btn-skip" id="key-skip" onclick="skipKeys()">跳过，使用默认密钥</button>
+      <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>
+    </div>
+    <div class="modal-err" id="key-err"></div>
+    <div class="modal-sec">🔒 默认密钥经公私钥加密机制保护，不会明文下发到浏览器；本工具不收集、不上传任何密钥。</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
 <script src="/js/util.js"></script>
 <script src="/js/theme.js"></script>
 <script src="/js/markdown.js"></script>
@@ -126,5 +156,6 @@
 <script src="/js/kline.js"></script>
 <script src="/js/ui.js"></script>
 <script src="/js/app.js"></script>
+<script src="/js/keys.js"></script>
 </body>
 </html>
