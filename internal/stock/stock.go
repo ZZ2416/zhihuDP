@@ -1,4 +1,4 @@
-// Package stock 股票识别客户端（东财 suggest 主选 + 腾讯 smartbox 兜底）
+// Package stock dao 层：股票数据访问（东财 suggest 主选 + 腾讯 smartbox 兜底）
 package stock
 
 import (

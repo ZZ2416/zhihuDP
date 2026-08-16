@@ -76,6 +76,18 @@ Router(server.Routes) → Handler(server.handle*) → Service 接口(Analyzer/Re
                                                     └─ stock.Resolve（Data）
 ```
 
+**与知乎 house style（org-go / user-core）对照**：
+
+| 本设计 | 知乎 house style | 说明 |
+|---|---|---|
+| `internal/server` | `pkg/router` + `pkg/handler` | HTTP 接入层 |
+| `internal/agent` | `pkg/controller` | 业务编排层（ReAct） |
+| `internal/sentiment` | `pkg/service` | 业务服务层 |
+| `internal/zhihu` / `internal/stock` | `pkg/dao` | 数据访问层 |
+| 显式注入（buildDeps） | 全局 Default 单例 | 保留注入（可测性更优） |
+| `internal/` | `pkg/` | 独立 demo，防外部误导入 |
+| `sentiment.Searcher` 接口 + mock | 接口 + impl + mock 标配 | 已对齐（编译期断言 `var _ Searcher = (*zhihu.Client)(nil)`） |
+
 **② 模块依赖（import 方向，单向无环；依赖注入避免全局状态）**
 
 ```

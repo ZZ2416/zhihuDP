@@ -1,4 +1,4 @@
-// Package agent eino ADK ChatModelAgent 组装与事件分发（ReAct 循环 + 自定义工具）
+// Package agent controller 层：业务编排（eino ADK ChatModelAgent ReAct 循环 + 工具 + 事件分发）
 package agent
 
 import (

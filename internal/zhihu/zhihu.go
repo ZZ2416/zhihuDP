@@ -1,4 +1,4 @@
-// Package zhihu 知乎开放平台客户端（Bearer + X-Request-Timestamp 鉴权）
+// Package zhihu dao 层：知乎开放平台数据访问（Bearer + X-Request-Timestamp 鉴权）
 package zhihu
 
 import (

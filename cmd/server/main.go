@@ -71,6 +71,12 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 	return f(ctx, q)
 }
 
+// 编译期断言：适配器满足 server 接口（house style）
+var (
+	_ server.Analyzer = (analyzerFunc)(nil)
+	_ server.Resolver = (resolverFunc)(nil)
+)
+
 // buildDeps 组装 agent 依赖（业务层接线点）
 func buildDeps(cfg *config.Config) agent.Deps {
 	zhClient := zhihu.New(cfg.Zhihu)

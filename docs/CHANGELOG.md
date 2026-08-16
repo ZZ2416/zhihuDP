@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-16 · v0.4.1 对齐知乎 house style（语义 + 接口 + 断言）
+
+**背景**：对照 CursorPJ 下 org-go / user-core 的分层，评估结论「结构已 80% 对齐，补三件小事」。
+
+**变更**：
+- 语义对齐：`internal/agent`=controller（编排）、`internal/sentiment`=service、`internal/zhihu`/`internal/stock`=dao（包注释 + 文档对照表）
+- 补 `sentiment.Searcher` 接口（消费方定义，`*zhihu.Client` 隐式实现）+ fake mock 单测（搜索失败/空结果降级路径，此前无密钥无法测）
+- 编译期断言：`var _ Searcher = (*zhihu.Client)(nil)`、`var _ server.Analyzer/Resolver = (adapter)(nil)`
+
+**未照搬**（有意保留）：全局 Default 单例（用显式注入）、`pkg/` 对外（用 `internal/`）、`controller/impl` 拆包（小项目不必要）。
+
+**验证**：build / vet / test 全过（sentiment 测试增至 4 个用例）。
+**文档同步**：`tech-design.md` §2.1 新增「与知乎 house style 对照」表。
+
+---
+
 ## 2026-08-16 · v0.4.0 Router/Handler/Service 分层
 
 **背景**：评审认为入口应分层（router/handler/service），本次按四层改造。

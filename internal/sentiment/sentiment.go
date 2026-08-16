@@ -1,4 +1,4 @@
-// Package sentiment 情绪分析：知乎搜索 → LLM 批量情感分类 → 规则强度分
+// Package sentiment service 层：情绪分析（知乎搜索 → LLM 批量情感分类 → 规则强度分）
 package sentiment
 
 import (
@@ -18,9 +18,14 @@ import (
 	"zhihudp/internal/zhihu"
 )
 
+// Searcher 知乎搜索接口（消费方定义；由 *zhihu.Client 隐式实现，便于 mock 单测）
+type Searcher interface {
+	Search(ctx context.Context, query string, count int) (*zhihu.SearchResponse, error)
+}
+
 // Analyze 编排：知乎搜索 → LLM 批量情感分类 → 规则强度分。
 // 任何环节失败都降级（Degraded=true）而非返回 error，让 agent 走降级文案。
-func Analyze(ctx context.Context, code, name string, zh *zhihu.Client, ds config.DeepSeekConfig) (*types.SentimentResult, error) {
+func Analyze(ctx context.Context, code, name string, s Searcher, ds config.DeepSeekConfig) (*types.SentimentResult, error) {
 	result := &types.SentimentResult{Code: code, Name: name, Items: []types.ViewItem{}}
 
 	if ds.APIKey == "" {
@@ -30,7 +35,7 @@ func Analyze(ctx context.Context, code, name string, zh *zhihu.Client, ds config
 	}
 
 	// 1) 知乎搜索（近 30 天讨论，取 10 条）
-	sr, err := zh.Search(ctx, name, 10)
+	sr, err := s.Search(ctx, name, 10)
 	if err != nil {
 		result.Degraded = true
 		result.ErrMsg = "知乎搜索失败：" + err.Error()

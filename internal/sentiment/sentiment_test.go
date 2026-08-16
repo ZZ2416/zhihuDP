@@ -2,12 +2,26 @@ package sentiment
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"zhihudp/internal/config"
 	"zhihudp/internal/types"
 	"zhihudp/internal/zhihu"
 )
+
+// 编译期断言：*zhihu.Client 满足 Searcher 接口（house style）
+var _ Searcher = (*zhihu.Client)(nil)
+
+// fakeSearcher mock 知乎搜索（验证 Analyze 依赖接口而非具体实现）
+type fakeSearcher struct {
+	resp *zhihu.SearchResponse
+	err  error
+}
+
+func (f fakeSearcher) Search(_ context.Context, _ string, _ int) (*zhihu.SearchResponse, error) {
+	return f.resp, f.err
+}
 
 func TestComputeStrength(t *testing.T) {
 	cases := []struct {
@@ -37,13 +51,48 @@ func TestComputeStrength(t *testing.T) {
 
 func TestAnalyze_NoKey_Degraded(t *testing.T) {
 	// 无 deepseek key：降级而非报错（业务规则 §4.5）
-	zhClient := zhihu.New(config.ZhihuConfig{})
-	result, err := Analyze(context.Background(), "600519", "贵州茅台", zhClient, config.DeepSeekConfig{})
+	result, err := Analyze(context.Background(), "600519", "贵州茅台", fakeSearcher{}, config.DeepSeekConfig{})
 	if err != nil {
 		t.Fatalf("无密钥时应降级而非返回 error: %v", err)
 	}
 	if !result.Degraded {
 		t.Errorf("无密钥时应 Degraded=true")
+	}
+	if result.Score != nil {
+		t.Errorf("降级时 Score 应为 nil")
+	}
+}
+
+func TestAnalyze_SearchError_Degraded(t *testing.T) {
+	// 搜索失败：降级而非报错
+	ds := config.DeepSeekConfig{APIKey: "fake-key", BaseURL: "https://api.deepseek.com"}
+	result, err := Analyze(context.Background(), "600519", "贵州茅台",
+		fakeSearcher{err: errors.New("网络超时")}, ds)
+	if err != nil {
+		t.Fatalf("搜索失败时应降级而非返回 error: %v", err)
+	}
+	if !result.Degraded {
+		t.Errorf("搜索失败时应 Degraded=true")
+	}
+	if result.Score != nil {
+		t.Errorf("降级时 Score 应为 nil")
+	}
+}
+
+func TestAnalyze_EmptyResults_Degraded(t *testing.T) {
+	// 无讨论结果：降级（样本不足）
+	ds := config.DeepSeekConfig{APIKey: "fake-key", BaseURL: "https://api.deepseek.com"}
+	resp := &zhihu.SearchResponse{Code: 0, Data: struct {
+		HasMore bool         `json:"HasMore"`
+		Items   []zhihu.Item `json:"Items"`
+	}{Items: []zhihu.Item{}}}
+
+	result, err := Analyze(context.Background(), "600519", "贵州茅台", fakeSearcher{resp: resp}, ds)
+	if err != nil {
+		t.Fatalf("空结果时应降级而非返回 error: %v", err)
+	}
+	if !result.Degraded {
+		t.Errorf("空结果时应 Degraded=true")
 	}
 	if result.Score != nil {
 		t.Errorf("降级时 Score 应为 nil")
