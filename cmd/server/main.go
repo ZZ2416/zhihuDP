@@ -49,7 +49,7 @@ func main() {
 		resolverFunc(stock.Resolve),
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
-		hotProviderFunc(hot.GetHot),
+		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -79,7 +79,7 @@ var (
 	_ server.Resolver      = (resolverFunc)(nil)
 	_ server.KlineProvider = (klineProviderFunc)(nil)
 	_ server.NewsProvider  = (newsProviderFunc)(nil)
-	_ server.HotProvider   = (hotProviderFunc)(nil)
+	_ server.HotProvider   = hotProviderFunc{}
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -97,10 +97,17 @@ func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口
-type hotProviderFunc func(ctx context.Context, typ string, count int) ([]types.HotItem, error)
+type hotProviderFunc struct {
+	getHot          func(ctx context.Context, typ string, count int) ([]types.HotItem, error)
+	getSectorStocks func(ctx context.Context, code string, count int) ([]types.HotItem, error)
+}
 
 func (f hotProviderFunc) GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error) {
-	return f(ctx, typ, count)
+	return f.getHot(ctx, typ, count)
+}
+
+func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count int) ([]types.HotItem, error) {
+	return f.getSectorStocks(ctx, code, count)
 }
 
 // buildDeps 组装 agent 依赖（业务层接线点）

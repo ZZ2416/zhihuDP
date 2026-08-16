@@ -6,15 +6,19 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"zhihudp/internal/types"
 )
 
-// handleHot GET /api/hot?type=stock|sector&count=：热门榜（展示数据，不进 LLM）
+// handleHot GET /api/hot?type=stock|sector|sector_stock&count=&code=
+// 热门榜（展示数据，不进 LLM）
 func (s *Server) handleHot(w http.ResponseWriter, r *http.Request) {
 	typ := r.URL.Query().Get("type")
-	if typ != "stock" && typ != "sector" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type 需为 stock 或 sector"})
+	if typ != "stock" && typ != "sector" && typ != "sector_stock" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type 需为 stock / sector / sector_stock"})
 		return
 	}
+
 	count := 8
 	if typ == "sector" {
 		count = 6
@@ -32,7 +36,20 @@ func (s *Server) handleHot(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	start := time.Now()
-	items, err := s.hotProvider.GetHot(ctx, typ, count)
+	var (
+		items []types.HotItem
+		err   error
+	)
+	if typ == "sector_stock" {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "sector_stock 需要 code 参数（板块代码）"})
+			return
+		}
+		items, err = s.hotProvider.GetSectorStocks(ctx, code, count)
+	} else {
+		items, err = s.hotProvider.GetHot(ctx, typ, count)
+	}
 	elapsed := time.Since(start).Milliseconds()
 
 	if err != nil {

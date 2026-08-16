@@ -143,3 +143,7 @@ type fakeHotProvider struct{}
 func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.HotItem, error) {
 	return []types.HotItem{{Code: "600519", Name: "贵州茅台", Price: 1341.99, ChangePct: -0.98, Type: typ}}, nil
 }
+
+func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
+	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
+}

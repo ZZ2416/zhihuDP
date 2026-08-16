@@ -126,5 +126,5 @@ end
 
 ## 11. 待确认
 
-- [ ] 板块 chip 点击 → 查询板块内个股（需板块成分接口，P1）还是保持仅展示？
-- [ ] ticker 是否加自动滚动动画（CSS marquee/JS requestAnimationFrame）？
+- [x] 板块 chip 点击 → 查询板块内成分股（已实现，腾讯 board_code 接口）
+- [x] ticker 自动滚动（CSS 无缝循环 + 悬停暂停 + reduced-motion 适配）

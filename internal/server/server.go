@@ -30,9 +30,10 @@ type NewsProvider interface {
 	GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error)
 }
 
-// HotProvider 热门榜服务接口（由 internal/hot.GetHot 实现）
+// HotProvider 热门榜服务接口（由 internal/hot 实现）
 type HotProvider interface {
 	GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error)
+	GetSectorStocks(ctx context.Context, code string, count int) ([]types.HotItem, error)
 }
 
 // Server HTTP 层（依赖注入：实现在 cmd/server.main 组装）

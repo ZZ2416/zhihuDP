@@ -26,8 +26,10 @@ async function apiAsk(stock) {
   });
 }
 
-async function apiHot(type, count) {
-  const resp = await fetch('/api/hot?type=' + encodeURIComponent(type) + '&count=' + (count || 8));
+async function apiHot(type, count, code) {
+  let u = '/api/hot?type=' + encodeURIComponent(type) + '&count=' + (count || 8);
+  if (code) u += '&code=' + encodeURIComponent(code);
+  const resp = await fetch(u);
   if (!resp.ok) return null;
   return resp.json();
 }

@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：两个待确认项落地
+
+**① 板块点击 → 成分股**：
+- `internal/hot` 新增 `GetSectorStocks`（腾讯 board_code=板块代码）
+- `/api/hot?type=sector_stock&code=pt01801712&count=`（HotProvider 接口扩展）
+- 前端：板块 chip 可点击 → 热门股票卡片切换为「板块成分 · XX」+ 「← 返回热门」
+
+**② ticker 自动滚动**：
+- CSS 无缝循环动画（双份内容 + `translateX(-50%)`）+ 悬停暂停 + `prefers-reduced-motion` 适配
+
+**数据源切换（实测驱动）**：东财 push2 再次被限流（全镜像 000）→ 热门数据改**腾讯源**（与 K线同源、稳定）：
+- 热门股票 = 成交额榜（腾讯无涨幅排序；成交额=市场活跃度，比涨幅榜更符合「热门」语义）
+- 热门板块 = `mktHs/rank?t=01/averatio`（板块涨幅榜）
+- 成分股 = `getBoardRankList?board_code={pt码}`（腾讯数值字段为字符串，已适配）
+
+**验证**：股票 6 条（兆易创新/亨通光电...）✅、板块（玻璃玻纤 4.31%）✅、成分股（中国巨石...）✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：首页热门推荐 + 看山吉祥物主题
 
 **需求/设计**：`features/ui_premiu/SRS.md` + `SDD.md`

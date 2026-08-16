@@ -231,3 +231,17 @@ footer p { margin: 3px 0; }
 .hot-stock .spct { font-size: 13px; font-weight: 700; width: 90px; text-align: right; }
 .hot-stock .up { color: var(--bull); } .hot-stock .down { color: var(--bear); }
 .hot-loading { color: var(--faint); font-size: 12px; padding: 6px 0; }
+
+/* ticker 自动滚动（无缝循环，悬停暂停） */
+.ticker-bar { overflow: hidden; }
+.ticker-track { display: flex; width: max-content; animation: ticker-scroll 40s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
+
+/* 热门股票卡片：板块成分上下文 + 返回 */
+.hot-label { font-size: 12px; color: var(--sub); font-weight: 400; margin-left: 4px; }
+.hot-back { font-size: 12px; color: var(--accent); margin-left: auto; cursor: pointer; font-weight: 400; }
+.hot-back:hover { text-decoration: underline; }
+.hot-chip { cursor: pointer; transition: background .2s, border-color .2s; }
+.hot-chip:hover { border-color: var(--accent); background: var(--accent-weak); }

@@ -106,7 +106,9 @@ function renderHotSectors(items) {
   let html = '';
   for (const it of items) {
     const up = (it.change_pct || 0) >= 0;
-    html += '<span class="hot-chip"><span class="hn">' + esc(it.name) + '</span>' +
+    const n = String(it.name || '').replace(/'/g, '');
+    html += '<span class="hot-chip" onclick="hotSectorClick(\'' + esc(it.code) + '\',\'' + esc(n) + '\')" title="查看板块成分股">' +
+      '<span class="hn">' + esc(it.name) + '</span>' +
       '<span class="hp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
   }
   el.innerHTML = html;
@@ -135,13 +137,15 @@ function renderHotStocks(items) {
 function renderTicker(items) {
   const el = $('ticker-bar');
   if (!items || !items.length) { el.innerHTML = ''; return; }
-  let html = '';
+  let group = '';
   for (const it of items) {
     const up = (it.change_pct || 0) >= 0;
-    html += '<span class="ticker-item" onclick="hotSearch(\'' + esc(it.name) + '\')">' +
+    const n = String(it.name || '').replace(/'/g, '');
+    group += '<span class="ticker-item" onclick="hotSearch(\'' + esc(n) + '\')">' +
       '<span class="tn">' + esc(it.name) + '</span>' +
       '<span class="tp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
       '</span>';
   }
-  el.innerHTML = html;
+  // 双份内容实现无缝滚动
+  el.innerHTML = '<div class="ticker-track">' + group + group + '</div>';
 }
