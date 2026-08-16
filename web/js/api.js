@@ -12,6 +12,13 @@ async function apiKline(code, market, days) {
   return resp.json();
 }
 
+async function apiNews(keyword, count) {
+  const resp = await fetch('/api/news?keyword=' + encodeURIComponent(keyword) +
+    '&count=' + (count || 5));
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
 async function apiAsk(stock) {
   return fetch('/api/ask', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

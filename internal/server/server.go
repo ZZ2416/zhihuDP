@@ -1,5 +1,5 @@
 // Package server HTTP 层：Router + Handler
-// 依赖 service 接口（Analyzer/Resolver/KlineProvider），不依赖具体实现，便于 httptest 测试与替换。
+// 依赖 service 接口（Analyzer/Resolver/KlineProvider/NewsProvider），不依赖具体实现，便于 httptest 测试与替换。
 package server
 
 import (
@@ -25,20 +25,27 @@ type KlineProvider interface {
 	GetKline(ctx context.Context, market, code string, days int) (*types.Kline, error)
 }
 
+// NewsProvider 资讯服务接口（由 internal/news.GetNews 实现）
+type NewsProvider interface {
+	GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error)
+}
+
 // Server HTTP 层（依赖注入：实现在 cmd/server.main 组装）
 type Server struct {
 	analyzer      Analyzer
 	resolver      Resolver
 	klineProvider KlineProvider
+	newsProvider  NewsProvider
 	frontend      fs.FS // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
 		klineProvider: klineProvider,
+		newsProvider:  newsProvider,
 		frontend:      frontend,
 	}
 }
@@ -46,9 +53,10 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, fron
 // Routes 注册路由（Router 层）
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/resolve", s.handleResolve) // 探针：股票识别（无需密钥）
-	mux.HandleFunc("GET /api/kline", s.handleKline)     // 行情：报价 + 日K线
-	mux.HandleFunc("POST /api/ask", s.handleAsk)        // SSE：完整分析
+	mux.HandleFunc("GET /api/resolve", s.handleResolve)   // 探针：股票识别（无需密钥）
+	mux.HandleFunc("GET /api/kline", s.handleKline)       // 行情：报价 + 日K线
+	mux.HandleFunc("GET /api/news", s.handleNews)         // 资讯：相关新闻（辅助）
+	mux.HandleFunc("POST /api/ask", s.handleAsk)          // SSE：完整分析
 	mux.Handle("GET /", http.FileServer(http.FS(s.frontend))) // 前端：index.html + css/js 静态资源
 	return mux
 }
