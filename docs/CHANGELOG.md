@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：favicon/主题换用指定看山图
+
+用户提供 `pic/v2-57ef90e293e644e853853915059e8e22_r.jpg`（800×800 正方形单视角看山）：
+- 复制为 `web/pic/kanshan.jpg`，生成 favicon.png（64×64）+ apple-touch-icon.png（180×180）
+- 顶栏 logo / hero 引用切换为 `kanshan.jpg`（移除四视图裁剪的 v1）
+- 验证：资产 200 ✅、旧引用 0 残留 ✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：真实看山素材 + 改名「知乎大盘」
 
 **① favicon 重裁**：手写 PNG 解码器分析四视图 4 个视角的鲸鱼 bbox（发现原裁剪右侧多 27px 边距不居中）→ **紧裁**（bbox+6px），生成 4 个候选 `web/pic/views/kanshan-v1..v4.png`；favicon 默认用 v1（64×64）
