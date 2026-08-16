@@ -2,12 +2,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"zhihudp/internal/agent"
@@ -28,11 +31,30 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "配置文件路径（默认 config.yaml）")
 	query := flag.String("q", "", "CLI 模式：运行一次分析并打印事件（如 -q 茅台）")
+	cmdKeygen := flag.Bool("keygen", false, "生成持久 RSA 密钥对并加密你的密钥（输出密文，可写入 config.yaml）")
+	cmdEnc := flag.String("enc", "", "用公钥加密一个密钥，输出 base64 密文（如 -enc sk-xxx）")
+	cmdPubkey := flag.Bool("pubkey", false, "打印持久公钥 PEM（手动加密用）")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
+	}
+
+	// 密钥工具子命令（不启动服务）
+	if *cmdKeygen || *cmdPubkey || *cmdEnc != "" {
+		runKeyTool(cfg, *cmdKeygen, *cmdPubkey, *cmdEnc, *configPath)
+		return
+	}
+
+	// 加载持久密钥对（私钥仅部署者本地，chmod 600）
+	kb, err := keybox.New(cfg.KeyBox.PrivateKey)
+	if err != nil {
+		log.Fatalf("初始化密钥箱失败: %v", err)
+	}
+	// 解密密文密钥（config.yaml 的 *_enc 字段）→ 覆盖明文，代码/配置无明文
+	if err := decryptEncKeys(cfg, kb); err != nil {
+		log.Fatalf("解密密钥失败: %v", err)
 	}
 	log.Printf("配置加载完成: %s", cfg.String())
 
@@ -44,11 +66,7 @@ func main() {
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
 	zhClient := zhihu.New(cfg.Zhihu)
-	kb, err := keybox.New()
-	if err != nil {
-		log.Fatalf("初始化密钥箱失败: %v", err)
-	}
-	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient}
+	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient, configPath: *configPath}
 	deps := buildDeps(cfg, zhClient)
 
 	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
@@ -149,11 +167,12 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 	return f.getSectorStocks(ctx, code, count)
 }
 
-// keyService 密钥箱服务：RSA 加解密 + 热更新运行中的配置（实现 server.KeyService）
+// keyService 密钥箱服务：RSA 加解密 + 热更新运行中的配置 + 密文持久化（实现 server.KeyService）
 type keyService struct {
 	*keybox.KeyBox
-	cfg      *config.Config
-	zhClient *zhihu.Client
+	cfg        *config.Config
+	zhClient   *zhihu.Client
+	configPath string // config.yaml 路径（上传密钥后持久化密文用）
 }
 
 // UpdateKeys 应用用户提交的密钥（空值表示该项未填写，保留原密钥）
@@ -168,8 +187,75 @@ func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
 	return nil
 }
 
+// PersistKeys 把加密后的密钥密文写回 config.yaml（只写 *_enc 字段，绝不落明文），
+// 重启后加载解密恢复 —— 仓库/配置泄露也只是密文。
+func (k *keyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error {
+	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc, zhihuSecretEnc)
+}
+
 // 编译期断言：keyService 满足 server.KeyService
 var _ server.KeyService = (*keyService)(nil)
+
+// decryptEncKeys 用持久私钥解密密文密钥（config.yaml 的 *_enc 字段）并覆盖明文
+func decryptEncKeys(cfg *config.Config, kb *keybox.KeyBox) error {
+	if cfg.DeepSeek.APIKeyEnc != "" {
+		plain, err := kb.DecryptOAEPBase64(cfg.DeepSeek.APIKeyEnc)
+		if err != nil {
+			return fmt.Errorf("解密 deepseek.api_key_enc 失败: %w", err)
+		}
+		cfg.DeepSeek.APIKey = string(plain)
+	}
+	if cfg.Zhihu.AccessSecretEnc != "" {
+		plain, err := kb.DecryptOAEPBase64(cfg.Zhihu.AccessSecretEnc)
+		if err != nil {
+			return fmt.Errorf("解密 zhihu.access_secret_enc 失败: %w", err)
+		}
+		cfg.Zhihu.AccessSecret = string(plain)
+	}
+	return nil
+}
+
+// runKeyTool 密钥工具子命令：keygen（生成密钥对 + 交互加密）/ pubkey / enc
+func runKeyTool(cfg *config.Config, doKeygen, doPubkey bool, encValue, configPath string) {
+	kb, err := keybox.New(cfg.KeyBox.PrivateKey)
+	if err != nil {
+		log.Fatalf("初始化密钥箱失败: %v", err)
+	}
+	if doPubkey {
+		fmt.Print(kb.PublicKeyPEM())
+		return
+	}
+	if encValue != "" {
+		ct, err := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), encValue)
+		if err != nil {
+			log.Fatalf("加密失败: %v", err)
+		}
+		fmt.Println(ct)
+		return
+	}
+	if doKeygen {
+		fmt.Printf("密钥对就绪：私钥 %s（600 权限）\n\n", cfg.KeyBox.PrivateKey)
+		fmt.Println("输入你的真实密钥（终端不回显），用公钥加密生成密文：")
+		reader := bufio.NewReader(os.Stdin)
+		readLine := func(prompt string) string {
+			fmt.Print(prompt)
+			s, _ := reader.ReadString('\n')
+			return strings.TrimSpace(s)
+		}
+		ds := readLine("DeepSeek API Key: ")
+		zh := readLine("知乎 Access Secret: ")
+		dsEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), ds)
+		zhEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), zh)
+		fmt.Println("\n=== 请把以下两行粘贴进 config.yaml（替换 deepseek 与 zhihu 下的对应字段）===")
+		if dsEnc != "" {
+			fmt.Printf("deepseek:\n  api_key_enc: %q\n", dsEnc)
+		}
+		if zhEnc != "" {
+			fmt.Printf("zhihu:\n  access_secret_enc: %q\n", zhEnc)
+		}
+		fmt.Println("\n（config.yaml 也可留空 *_enc 字段，改用开屏弹窗上传）")
+	}
+}
 
 // buildDeps 组装 agent 依赖（业务层接线点）
 func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {

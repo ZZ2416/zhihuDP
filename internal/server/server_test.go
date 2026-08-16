@@ -56,6 +56,8 @@ func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []b
 
 func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
 
+func (fakeKeyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error { return nil }
+
 // fakeChatProvider 二期对话桩：直接回一段 delta
 type fakeChatProvider struct{}
 

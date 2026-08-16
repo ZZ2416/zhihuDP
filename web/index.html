@@ -164,7 +164,7 @@
       <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>
     </div>
     <div class="modal-err" id="key-err"></div>
-    <div class="modal-sec">🔒 默认密钥经公私钥加密机制保护，不会明文下发到浏览器；本工具不收集、不上传任何密钥。</div>
+    <div class="modal-sec">🔒 密钥在浏览器内 RSA 加密后传输，服务端解密后加密持久化（config.yaml 仅存密文），代码中无明文；本工具不收集、不上传任何密钥。</div>
   </div>
 </div>
 

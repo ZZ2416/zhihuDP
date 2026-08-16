@@ -3,6 +3,7 @@ package server
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -54,5 +55,9 @@ func (s *Server) handleUpdateKeys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	// 持久化密文到 config.yaml（只写 *_enc 字段）：重启后加载解密恢复，仓库/配置无明文
+	if err := s.keyService.PersistKeys(req.DeepseekKey, req.ZhihuSecret); err != nil {
+		log.Printf("[keybox] 密文持久化失败: %v（密钥已热更新，重启后需重新上传）", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": true})
 }

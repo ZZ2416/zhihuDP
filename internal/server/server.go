@@ -49,6 +49,8 @@ type KeyService interface {
 	DecryptOAEPBase64(b64 string) ([]byte, error)
 	// UpdateKeys 接收解密后的用户密钥并热更新（deepseekKey/zhihuSecret 为空表示该项跳过）
 	UpdateKeys(deepseekKey, zhihuSecret string) error
+	// PersistKeys 把加密后的密钥密文持久化到 config.yaml（只写 *_enc 字段，不落明文）
+	PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error
 }
 
 // ChatProvider 二期追问对话服务接口（由 internal/chat.Service 实现）

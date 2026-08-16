@@ -101,7 +101,7 @@
       if (!resp.ok) throw new Error(data.error || '保存失败，请稍后重试');
       localStorage.setItem(STORAGE_KEY, 'custom');
       hideKeyModal();
-      toast('密钥已加密保存并生效');
+      toast('密钥已加密保存并持久化，重启后继续生效');
     } catch (e) {
       showKeyErr(e.message || '保存失败，请稍后重试');
     } finally {

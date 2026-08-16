@@ -27,17 +27,24 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 
 // ZhihuConfig 知乎开放平台配置
 type ZhihuConfig struct {
-	AccessSecret   string `yaml:"access_secret"`    // 必填：知乎 Bearer token
-	OpenAPIBaseURL string `yaml:"openapi_base_url"` // 默认 https://developer.zhihu.com
-	SearchURL      string `yaml:"zhihu_search_url"` // 可选：完整 endpoint，优先级最高
+	AccessSecret    string `yaml:"access_secret"`     // 必填：知乎 Bearer token（明文，与 enc 二选一）
+	AccessSecretEnc string `yaml:"access_secret_enc"` // 可选：RSA 公钥加密后的密文（存在时优先，解密覆盖）
+	OpenAPIBaseURL  string `yaml:"openapi_base_url"`  // 默认 https://developer.zhihu.com
+	SearchURL       string `yaml:"zhihu_search_url"`  // 可选：完整 endpoint，优先级最高
 	KnowledgeBaseID string `yaml:"knowledge_base_id"` // 可选：知识库搜索用（股票讨论知识库）
 }
 
 // DeepSeekConfig DeepSeek 模型配置
 type DeepSeekConfig struct {
-	APIKey  string   `yaml:"api_key"`  // 必填
-	BaseURL string   `yaml:"base_url"` // 默认 https://api.deepseek.com
-	Timeout Duration `yaml:"timeout"`  // 默认 120s
+	APIKey    string   `yaml:"api_key"`     // 必填（明文，与 enc 二选一）
+	APIKeyEnc string   `yaml:"api_key_enc"` // 可选：RSA 公钥加密后的密文（存在时优先）
+	BaseURL   string   `yaml:"base_url"`    // 默认 https://api.deepseek.com
+	Timeout   Duration `yaml:"timeout"`     // 默认 120s
+}
+
+// KeyBoxConfig 密钥箱配置（持久 RSA 密钥对）
+type KeyBoxConfig struct {
+	PrivateKey string `yaml:"private_key"` // 私钥文件路径（部署者本地，chmod 600）
 }
 
 // ServerConfig HTTP 服务配置
@@ -49,7 +56,17 @@ type ServerConfig struct {
 type Config struct {
 	Zhihu    ZhihuConfig    `yaml:"zhihu"`
 	DeepSeek DeepSeekConfig `yaml:"deepseek"`
+	KeyBox   KeyBoxConfig   `yaml:"keybox"`
 	Server   ServerConfig   `yaml:"server"`
+}
+
+// defaultKeyBoxDir 默认私钥目录：$HOME/.zhihudp
+func defaultKeyBoxDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ".zhihudp"
+	}
+	return home + "/.zhihudp"
 }
 
 func defaultConfig() *Config {
@@ -57,6 +74,7 @@ func defaultConfig() *Config {
 	c.Zhihu.OpenAPIBaseURL = "https://developer.zhihu.com"
 	c.DeepSeek.BaseURL = "https://api.deepseek.com"
 	c.DeepSeek.Timeout = Duration(120 * time.Second)
+	c.KeyBox.PrivateKey = defaultKeyBoxDir() + "/zhihudp_private.pem"
 	c.Server.Port = 8080
 	return c
 }
@@ -68,7 +86,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("[warn] 配置文件 %s 不存在，使用默认值（如需密钥请复制 config.example.yaml 填写）\n", path)
+			fmt.Fprintf(os.Stderr, "[warn] 配置文件 %s 不存在，使用默认值（如需密钥请复制 config.example.yaml 填写）\n", path)
 			return cfg, nil
 		}
 		return nil, fmt.Errorf("读取配置文件失败: %w", err)
@@ -91,10 +109,10 @@ func Load(path string) (*Config, error) {
 
 	// 必填校验：只警告不 panic（调用时再明确报错）
 	if cfg.Zhihu.AccessSecret == "" {
-		fmt.Println("[warn] 未配置 zhihu.access_secret（知乎 Bearer token），搜索接口将不可用")
+		fmt.Fprintln(os.Stderr, "[warn] 未配置 zhihu.access_secret（知乎 Bearer token），搜索接口将不可用")
 	}
 	if cfg.DeepSeek.APIKey == "" {
-		fmt.Println("[warn] 未配置 deepseek.api_key，AI 分析将不可用")
+		fmt.Fprintln(os.Stderr, "[warn] 未配置 deepseek.api_key，AI 分析将不可用")
 	}
 
 	return cfg, nil
@@ -111,6 +129,67 @@ func (c *Config) String() string {
 		}
 		return s[:2] + "****" + s[len(s)-2:]
 	}
-	return fmt.Sprintf("Config{zhihu_secret:%s, deepseek_key:%s, base_url:%s, port:%d}",
-		mask(c.Zhihu.AccessSecret), mask(c.DeepSeek.APIKey), c.DeepSeek.BaseURL, c.Server.Port)
+	keyMode := "明文"
+	if c.DeepSeek.APIKeyEnc != "" || c.Zhihu.AccessSecretEnc != "" {
+		keyMode = "密文"
+	}
+	return fmt.Sprintf("Config{zhihu_secret:%s, deepseek_key:%s, key_mode:%s, base_url:%s, port:%d}",
+		mask(c.Zhihu.AccessSecret), mask(c.DeepSeek.APIKey), keyMode, c.DeepSeek.BaseURL, c.Server.Port)
+}
+
+// PersistEnc 把加密后的密钥密文写回 config.yaml（只写 enc 字段，绝不落明文）。
+// 用于开屏「上传密钥」后持久化：重启后加载解密恢复。
+func (c *Config) PersistEnc(path, deepseekEnc, zhihuEnc string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			data = []byte{}
+		} else {
+			return fmt.Errorf("读取配置文件失败: %w", err)
+		}
+	}
+	var raw map[string]any
+	if len(data) > 0 {
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("解析配置文件失败: %w", err)
+		}
+	}
+	raw = ensureMap(raw)
+	if deepseekEnc != "" {
+		setNested(raw, []string{"deepseek", "api_key_enc"}, deepseekEnc)
+	}
+	if zhihuEnc != "" {
+		setNested(raw, []string{"zhihu", "access_secret_enc"}, zhihuEnc)
+	}
+	out, err := yaml.Marshal(raw)
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %w", err)
+	}
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		return fmt.Errorf("写回配置文件失败: %w", err)
+	}
+	return nil
+}
+
+func ensureMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func setNested(m map[string]any, keys []string, val any) {
+	cur := m
+	for i, k := range keys {
+		if i == len(keys)-1 {
+			cur[k] = val
+			return
+		}
+		next, ok := cur[k].(map[string]any)
+		if !ok {
+			next = map[string]any{}
+			cur[k] = next
+		}
+		cur = next
+	}
 }
