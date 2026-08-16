@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zhihuDP · 知乎股票情绪分析</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg class="whale" viewBox="0 0 64 48" aria-hidden="true">
+      <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
+      <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
+      <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
+      <circle cx="34" cy="18" r="2.6" fill="#fff"/>
+      <path d="M30 25 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+    <span>zhihuDP</span>
+  </div>
+  <div class="header-right">
+    <span class="tag">知乎股票情绪分析 · 信息工具</span>
+    <button id="theme-btn" title="切换明暗主题" onclick="toggleTheme()">🌙</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 搜索视图 -->
+  <section id="view-search" class="view">
+    <div class="hero">
+      <svg class="big-whale" viewBox="0 0 64 48" aria-hidden="true">
+        <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
+        <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
+        <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
+        <path d="M34 18 c2.5-1 5-1.5 7.5-1.5" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <circle cx="27" cy="17" r="2.6" fill="#fff"/>
+        <path d="M23 24 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <h2>看看知乎上大家在聊什么</h2>
+      <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
+    </div>
+    <div class="card search-card">
+      <div class="search">
+        <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
+        <button id="search-btn" onclick="doSearch()">查询</button>
+      </div>
+      <div id="suggest" class="suggest hidden"></div>
+      <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
+    </div>
+  </section>
+
+  <!-- 详情视图 -->
+  <section id="view-detail" class="view hidden">
+    <a class="back" onclick="showSearch()">← 返回查询</a>
+
+    <div class="card">
+      <div class="stock-head" id="stock-head"></div>
+    </div>
+
+    <div class="card hidden" id="quote-card">
+      <div class="section-title">实时行情</div>
+      <div id="quote-body"></div>
+      <div id="kline-chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">情绪面板</div>
+      <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">AI 分析</div>
+      <div id="analysis"></div><span id="cursor" class="blink"></span>
+    </div>
+
+    <div id="error-box" class="card hidden"><div class="err-box"></div></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="foot-links">
+    <a href="https://github.com/ZZ2416" target="_blank" rel="noopener">GitHub 主页</a>
+    <span class="dot">·</span>
+    <span>创作者：zhangzhi</span>
+    <span class="dot">·</span>
+    <a href="https://github.com/ZZ2416/zhihuDP/issues" target="_blank" rel="noopener">联系与反馈</a>
+  </div>
+  <p>本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。据此操作，风险自担。</p>
+  <p>参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。</p>
+</footer>
+
+<script src="/js/util.js"></script>
+<script src="/js/theme.js"></script>
+<script src="/js/markdown.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/sse.js"></script>
+<script src="/js/kline.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"zhihudp/internal/types"
 )
@@ -38,8 +40,15 @@ func (fakeKlineProvider) GetKline(_ context.Context, market, code string, days i
 }
 
 func newTestServer() *Server {
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, []byte("<html>test</html>"))
+	frontend := fstest.MapFS{
+		"index.html":      {Data: []byte("<html>test</html>")},
+		"css/style.css":   {Data: []byte("body{}")},
+		"js/app.js":       {Data: []byte("// app")},
+	}
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, frontend)
 }
+
+var _ fs.FS = (fstest.MapFS)(nil)
 
 func TestResolveHandler(t *testing.T) {
 	s := newTestServer()

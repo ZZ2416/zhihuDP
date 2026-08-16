@@ -1,0 +1,84 @@
+/* ui.js —— 展示层：报价卡 / 情绪面板 / 错误提示 渲染 */
+const sentiLabel = { bull: '看多', bear: '看空', neutral: '中性' };
+const scoreClass = n => n <= 3 ? 'low' : (n <= 7 ? 'mid' : 'high');
+
+/* ---- 报价卡 ---- */
+function renderQuote(q) {
+  const up = (q.change || 0) >= 0;
+  const color = up ? 'var(--bull)' : 'var(--bear)';
+  const sign = up ? '+' : '';
+  const vol = (q.volume || 0) >= 10000 ? (q.volume / 10000).toFixed(2) + '万手' : (q.volume || 0) + '手';
+  $('quote-body').innerHTML =
+    '<div class="q-row">' +
+      '<div>' +
+        '<span class="q-price" style="color:' + color + '">' + (q.price || 0).toFixed(2) + '</span>' +
+        '<span class="q-change" style="color:' + color + '">' + sign + (q.change || 0).toFixed(2) + '  ' + sign + (q.change_pct || 0).toFixed(2) + '%</span>' +
+      '</div>' +
+      '<div class="q-grid">' +
+        qCell('今开', (q.open || 0).toFixed(2)) +
+        qCell('最高', (q.high || 0).toFixed(2)) +
+        qCell('最低', (q.low || 0).toFixed(2)) +
+        qCell('昨收', (q.prev_close || 0).toFixed(2)) +
+        qCell('成交量', vol) +
+      '</div>' +
+    '</div>';
+  $('quote-card').classList.remove('hidden');
+}
+function qCell(k, v) {
+  return '<div class="q-cell"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+}
+
+/* ---- 情绪面板 ---- */
+function renderSentiment(s) {
+  if (!s) return;
+  let html = '';
+  if (s.degraded) {
+    html += '<div class="degraded">' + esc(s.err_msg || '数据不足，已降级展示') + '</div>';
+  }
+  html += '<div class="heat"><span class="num">' + (s.heat || 0) + '</span>' +
+    '<span class="label">条近期讨论</span>' +
+    '<span class="sample">样本 ' + (s.sample || 0) + ' 条</span></div>';
+
+  const r = s.ratio || {};
+  html += ratioRow('看多', 'bull', r.bull) + ratioRow('看空', 'bear', r.bear) + ratioRow('中性', 'neutral', r.neutral);
+
+  if (s.score != null) {
+    html += '<div class="score-box">' +
+      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--faint)">/10</small></span>' +
+      '<span class="score-note">参考强度：反映当前讨论情绪与数据的充分程度，不代表涨跌预测。</span></div>';
+  }
+
+  const items = s.items || [];
+  if (items.length) {
+    html += '<div class="section-title" style="margin-top:18px">代表观点</div><div class="items">';
+    for (const it of items) {
+      html += '<div class="item">' +
+        '<div class="title-line">' +
+        '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '(无标题)') + '</a>' +
+        '<span class="tag-sentiment ' + esc(it.sentiment || 'neutral') + '">' + esc(sentiLabel[it.sentiment] || '中性') + '</span>' +
+        '</div>' +
+        '<div class="meta"><span>✍️ ' + esc(it.author || '匿名') + '</span><span>👍 ' + (it.vote_up || 0) + '</span></div>' +
+        '<div class="excerpt">' + esc(it.excerpt || '') + '</div>' +
+        '</div>';
+    }
+    html += '</div>';
+  }
+  $('sentiment-body').innerHTML = html;
+}
+
+function ratioRow(label, cls, val) {
+  const p = Math.round((val || 0) * 100);
+  return '<div class="ratio-row"><span class="rlabel">' + label + '</span>' +
+    '<div class="bar"><div class="' + cls + '" style="width:' + p + '%"></div></div>' +
+    '<span class="rpct">' + p + '%</span></div>';
+}
+
+/* ---- 错误 ---- */
+function showError(msg) {
+  const box = $('error-box');
+  box.classList.remove('hidden');
+  box.querySelector('.err-box').innerHTML =
+    '<strong>😥 出错了，请稍后重试。</strong>' +
+    '<div class="detail">' + esc(msg || '未知错误') + '</div>';
+}
+function hideError() { $('error-box').classList.add('hidden'); }

@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 
 	"zhihudp/internal/types"
@@ -29,16 +30,16 @@ type Server struct {
 	analyzer      Analyzer
 	resolver      Resolver
 	klineProvider KlineProvider
-	indexHTML     []byte // 前端（go:embed，由入口注入）
+	frontend      fs.FS // 前端资源（go:embed，由入口注入）
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, indexHTML []byte) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
 		klineProvider: klineProvider,
-		indexHTML:     indexHTML,
+		frontend:      frontend,
 	}
 }
 
@@ -48,6 +49,6 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/resolve", s.handleResolve) // 探针：股票识别（无需密钥）
 	mux.HandleFunc("GET /api/kline", s.handleKline)     // 行情：报价 + 日K线
 	mux.HandleFunc("POST /api/ask", s.handleAsk)        // SSE：完整分析
-	mux.HandleFunc("GET /", s.handleIndex)              // 前端入口
+	mux.Handle("GET /", http.FileServer(http.FS(s.frontend))) // 前端：index.html + css/js 静态资源
 	return mux
 }

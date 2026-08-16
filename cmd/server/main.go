@@ -17,7 +17,7 @@ import (
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
-	"zhihudp/internal/web"
+	"zhihudp/web"
 	"zhihudp/internal/zhihu"
 )
 
@@ -40,17 +40,13 @@ func main() {
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
 	deps := buildDeps(cfg)
-	indexHTML, err := web.FS.ReadFile("index.html")
-	if err != nil {
-		log.Fatalf("读取前端资源失败: %v", err)
-	}
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
 		}),
 		resolverFunc(stock.Resolve),
 		klineProviderFunc(kline.GetKline),
-		indexHTML,
+		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

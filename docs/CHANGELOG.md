@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-08-16 · 前端分层：独立 web/ 文件夹
+
+**背景**：前端从单文件 `internal/web/index.html`（内联 CSS/JS）重构为独立分层的 `web/` 文件夹。
+
+**结构**：
+```
+web/
+├── index.html          # 页面骨架（外链 css/js，无内联样式脚本）
+├── css/style.css       # 设计系统（明暗主题变量）+ 组件样式
+├── js/
+│   ├── util.js         # 工具（$ / esc）
+│   ├── theme.js        # 主题切换
+│   ├── api.js          # API 层（resolve / kline / ask）
+│   ├── sse.js          # SSE 协议解析
+│   ├── markdown.js     # AI 分析 markdown 渲染
+│   ├── kline.js        # K线 SVG 蜡烛图
+│   ├── ui.js           # 展示层（报价卡/情绪面板/错误）
+│   └── app.js          # 入口（视图/事件/状态）
+└── embed.go            # go:embed 内嵌（index.html css js）
+```
+
+**变更**：
+- `internal/web` 移除 → 顶层 `web/` 独立文件夹（与 cmd/internal 平级）
+- `server.New` 签名：`indexHTML []byte` → `frontend fs.FS`；Routes 用 `http.FileServer` 提供 index.html + 静态资源
+- `internal/server/handler_index.go` 删除（FileServer 接管）
+
+**验证**：首页外链 9 个静态资源全 200 ✅、resolve/kline 200 ✅、SSE 全链路（847 delta）✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · feature/kline：K线图与股价信息（实现完成）
 
 **需求/设计**：`features/kline/SRS.md` + `features/kline/SDD.md`（分支内评审通过）
