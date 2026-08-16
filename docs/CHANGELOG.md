@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：顶栏看山 banner 背景
+
+用户提供 `pic/fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg`（800×400 横版）→ `web/pic/kanshan-header.jpg`：
+- 顶栏加高至 84px，banner 靠右显示（`auto 100%` 不裁切）
+- **主题协调**：左侧实底色（`--bg`）保证 logo/文字可读 + 中间 62% 渐隐过渡 + 右侧图，双主题自适应（`color-mix`）
+- 验证：banner 200 ✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：favicon/主题换用指定看山图
 
 用户提供 `pic/v2-57ef90e293e644e853853915059e8e22_r.jpg`（800×800 正方形单视角看山）：
