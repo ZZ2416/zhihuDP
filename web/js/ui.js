@@ -143,7 +143,10 @@ function renderTicker(items) {
     const n = String(it.name || '').replace(/'/g, '');
     group += '<span class="ticker-item" onclick="hotSearch(\'' + esc(n) + '\')">' +
       '<span class="tn">' + esc(it.name) + '</span>' +
-      '<span class="tp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '<span class="row2">' +
+        '<span class="tp">' + (it.price || 0).toFixed(2) + '</span>' +
+        '<span class="td ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '</span>' +
       '</span>';
   }
   // 双份内容实现无缝滚动
