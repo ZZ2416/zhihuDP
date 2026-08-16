@@ -21,8 +21,8 @@ type eastmoneyResp struct {
 		Data []struct {
 			Code             string `json:"Code"`
 			Name             string `json:"Name"`
-			Classify         string `json:"Classify"`          // AStock / Fund / Bond ...
-			SecurityTypeName string `json:"SecurityTypeName"`  // 沪A / 深A / 北A
+			Classify         string `json:"Classify"`         // AStock / Fund / Bond ...
+			SecurityTypeName string `json:"SecurityTypeName"` // 沪A / 深A / 北A
 		} `json:"Data"`
 	} `json:"QuotationCodeTable"`
 }
@@ -155,7 +155,7 @@ func doGet(req *http.Request, timeout time.Duration) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

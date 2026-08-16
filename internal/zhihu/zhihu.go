@@ -76,7 +76,7 @@ func (c *Client) Search(ctx context.Context, query string, count int) (*SearchRe
 	if err != nil {
 		return nil, fmt.Errorf("调用 zhihu_search 失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取 zhihu_search 响应失败: %w", err)

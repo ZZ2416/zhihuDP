@@ -25,9 +25,9 @@ func (f fakeSearcher) Search(_ context.Context, _ string, _ int) (*zhihu.SearchR
 
 func TestComputeStrength(t *testing.T) {
 	cases := []struct {
-		name          string
-		r             types.Ratio
-		sample, heat  int
+		name             string
+		r                types.Ratio
+		sample, heat     int
 		wantMin, wantMax int
 	}{
 		{"一致性强+样本足", types.Ratio{Bull: 0.9, Bear: 0.05}, 50, 40, 7, 10},

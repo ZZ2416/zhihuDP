@@ -37,8 +37,8 @@ type ViewItem struct {
 type SentimentResult struct {
 	Code     string     `json:"code"`
 	Name     string     `json:"name"`
-	Heat     int        `json:"heat"`     // 讨论量（demo：本次取回条数）
-	Sample   int        `json:"sample"`   // 实际分类样本数
+	Heat     int        `json:"heat"`   // 讨论量（demo：本次取回条数）
+	Sample   int        `json:"sample"` // 实际分类样本数
 	Ratio    Ratio      `json:"ratio"`
 	Score    *int       `json:"score"`    // 参考强度 1-10；样本不足为 nil
 	Items    []ViewItem `json:"items"`    // 代表观点 ≤5
