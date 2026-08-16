@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-08-16 · ui_premiu：真实看山素材 + 改名「知乎大盘」
+
+**① favicon 重裁**：手写 PNG 解码器分析四视图 4 个视角的鲸鱼 bbox（发现原裁剪右侧多 27px 边距不居中）→ **紧裁**（bbox+6px），生成 4 个候选 `web/pic/views/kanshan-v1..v4.png`；favicon 默认用 v1（64×64）
+
+**② 页面全面用真实看山**（不用手绘）：
+- 顶栏 logo：手绘 SVG 鲸鱼 → **真实看山图**（kanshan-v1）
+- hero：手绘「看山看报表」场景 → **真实看山图**（160px 圆角卡）
+
+**③ 改名「知乎大盘」**：`<title>`、logo 文字、README 全部改为「知乎大盘」（GitHub 仓库 URL 与文件夹名 `zhihuDP` 保持真实值）
+
+**验证**：知乎大盘 ×2、真实素材引用 ✅、favicon/views 资产 200 ✅、lint/test 全绿 ✅
+
+---
+
 ## 2026-08-16 · ui_premiu：ticker 重构 + 移除知乎热榜
 
 **ticker 重构**：

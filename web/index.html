@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>zhihuDP · 知乎股票情绪分析</title>
+<title>知乎大盘 · 知乎股票情绪分析</title>
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/css/style.css">
@@ -12,15 +12,8 @@
 
 <header>
   <div class="logo">
-    <svg class="whale" viewBox="0 0 64 48" aria-hidden="true">
-      <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
-      <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
-      <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
-      <circle cx="34" cy="18" r="2.6" fill="#fff"/>
-      <path d="M30 25 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
-    </svg>
-    <span>zhihuDP</span>
+    <img class="logo-whale" src="/pic/views/kanshan-v1.png" alt="看山">
+    <span>知乎大盘</span>
   </div>
   <div class="header-right">
     <span class="tag">知乎股票情绪分析 · 信息工具</span>
@@ -42,41 +35,7 @@
       <!-- 搜索视图 -->
       <section id="view-search" class="view">
         <div class="hero">
-          <svg class="mascot-scene" viewBox="0 0 320 190" aria-hidden="true">
-            <!-- 看山在看报表 -->
-            <g transform="translate(168,22)">
-              <rect width="136" height="146" rx="12" fill="var(--card)" stroke="var(--border)"/>
-              <rect x="12" y="12" width="80" height="13" rx="5" fill="var(--accent-weak)"/>
-              <rect x="12" y="33" width="112" height="2" fill="var(--border)"/>
-              <!-- K线报表（红涨绿跌） -->
-              <g stroke-linecap="round">
-                <line x1="30" y1="60" x2="30" y2="100" stroke="var(--bull)" stroke-width="2"/>
-                <rect x="27" y="62" width="6" height="30" fill="var(--bull)"/>
-                <line x1="55" y1="52" x2="55" y2="92" stroke="var(--bear)" stroke-width="2"/>
-                <rect x="52" y="70" width="6" height="18" fill="var(--bear)"/>
-                <line x1="80" y1="44" x2="80" y2="78" stroke="var(--bull)" stroke-width="2"/>
-                <rect x="77" y="48" width="6" height="26" fill="var(--bull)"/>
-                <line x1="105" y1="38" x2="105" y2="70" stroke="var(--bull)" stroke-width="2"/>
-                <rect x="102" y="42" width="6" height="24" fill="var(--bull)"/>
-              </g>
-              <polyline points="27,96 52,78 77,64 102,52" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>
-              <text x="12" y="132" font-size="9" fill="var(--faint)">近60日 · 知乎讨论热度 ↑</text>
-            </g>
-            <!-- 看山（蓝鲸） -->
-            <g transform="translate(18,66)">
-              <path d="M16 34 C7 24 4 15 7 9 c9 6 13 15 13 24z" fill="var(--accent)"/>
-              <path d="M16 34 C7 44 4 53 7 59 c9-6 13-15 13-24z" fill="var(--accent)"/>
-              <path d="M22 31 c0-12 10-21 24-21 h18 c15 0 27 9 27 21 c0 12-12 21-27 21 h-18 c-14 0-24-9-24-21z" fill="var(--accent)"/>
-              <circle cx="46" cy="26" r="4" fill="#fff"/>
-              <path d="M40 36 c3 3 8 3 11 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-              <path d="M33 12 c-3-5-9-6-12-5 M36 11 c-2-6-6-9-12-9 M39 14 c0-8-6-12-13-12" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round"/>
-            </g>
-            <!-- 对话气泡 -->
-            <g transform="translate(100,20)">
-              <rect width="86" height="30" rx="14" fill="var(--card)" stroke="var(--accent)"/>
-              <text x="43" y="19" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent)">咦，有热度！</text>
-            </g>
-          </svg>
+          <img class="mascot" src="/pic/views/kanshan-v1.png" alt="看山" title="看山">
           <h2>看看知乎上大家在聊什么</h2>
           <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
         </div>

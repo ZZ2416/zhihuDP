@@ -44,6 +44,7 @@ header {
 }
 .logo { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
 .logo .whale { width: 34px; height: 30px; }
+.logo .logo-whale { height: 34px; width: auto; border-radius: 8px; }
 .header-right { display: flex; align-items: center; gap: 14px; }
 .tag { font-size: 12px; color: var(--sub); }
 #theme-btn {
@@ -213,7 +214,7 @@ footer p { margin: 3px 0; }
 .ticker-item .up { color: var(--bull); } .ticker-item .down { color: var(--bear); }
 
 /* ===== 吉祥物 ===== */
-.mascot { width: 120px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); padding: 6px; box-shadow: var(--shadow); margin: 0 auto 14px; display: block; }
+.mascot { width: 160px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); padding: 6px; box-shadow: var(--shadow); margin: 0 auto 14px; display: block; }
 
 /* ===== 热门卡片（终端面板） ===== */
 .hot-card { margin-top: 14px; }
