@@ -76,7 +76,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

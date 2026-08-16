@@ -22,3 +22,10 @@ config.yaml
 
 # RSA 私钥（部署者本地 ~/.zhihudp/zhihudp_private.pem；此处兜底防误提交）
 **/zhihudp_private.pem
+
+# 看山素材（知乎 IP，版权原因不入库；本地保留，go:embed 编译不受影响）
+/pic/看山三视图/
+/pic/刘看山3d+平面/
+/pic/v2-57ef90e293e644e853853915059e8e22_r.jpg
+/pic/fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg
+/web/pic/

@@ -52,11 +52,18 @@ type ServerConfig struct {
 	Port int `yaml:"port"` // 默认 8080
 }
 
+// MediaConfig 媒体目录（静态资源：演示视频等，经 /media/ 路由播放）
+type MediaConfig struct {
+	Dir   string `yaml:"dir"`   // 磁盘目录；空 = 禁用 /media/ 路由
+	Token string `yaml:"token"` // 访问令牌：无/错 token 一律 403（防未授权访问与转发）
+}
+
 // Config 应用配置
 type Config struct {
 	Zhihu    ZhihuConfig    `yaml:"zhihu"`
 	DeepSeek DeepSeekConfig `yaml:"deepseek"`
 	KeyBox   KeyBoxConfig   `yaml:"keybox"`
+	Media    MediaConfig    `yaml:"media"`
 	Server   ServerConfig   `yaml:"server"`
 }
 
@@ -75,6 +82,7 @@ func defaultConfig() *Config {
 	c.DeepSeek.BaseURL = "https://api.deepseek.com"
 	c.DeepSeek.Timeout = Duration(120 * time.Second)
 	c.KeyBox.PrivateKey = defaultKeyBoxDir() + "/zhihudp_private.pem"
+	c.Media.Dir = "" // 默认禁用；服务器上 config.yaml 配 media.dir 启用 /media/ 路由
 	c.Server.Port = 8080
 	return c
 }
