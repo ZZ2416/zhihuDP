@@ -25,3 +25,9 @@ async function apiAsk(stock) {
     body: JSON.stringify({ stock })
   });
 }
+
+async function apiHot(type, count) {
+  const resp = await fetch('/api/hot?type=' + encodeURIComponent(type) + '&count=' + (count || 8));
+  if (!resp.ok) return null;
+  return resp.json();
+}

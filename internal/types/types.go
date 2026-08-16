@@ -89,3 +89,12 @@ type NewsItem struct {
 	Date   string `json:"date"`   // 2026-08-14 23:18:00
 	Source string `json:"source"` // 固定 "东方财富"
 }
+
+// HotItem 热门榜单项（股票或板块，GET /api/hot 返回体元素）
+type HotItem struct {
+	Code      string  `json:"code"`       // 股票代码 / 板块代码
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`      // 最新价（板块为指数点位）
+	ChangePct float64 `json:"change_pct"` // 涨跌幅 %
+	Type      string  `json:"type"`       // stock / sector
+}

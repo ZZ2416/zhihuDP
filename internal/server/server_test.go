@@ -51,7 +51,7 @@ func newTestServer() *Server {
 		"css/style.css":   {Data: []byte("body{}")},
 		"js/app.js":       {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -136,4 +136,10 @@ func TestIndexHandler(t *testing.T) {
 	if rec.Body.String() != "<html>test</html>" {
 		t.Errorf("首页内容错误: %s", rec.Body.String())
 	}
+}
+
+type fakeHotProvider struct{}
+
+func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.HotItem, error) {
+	return []types.HotItem{{Code: "600519", Name: "贵州茅台", Price: 1341.99, ChangePct: -0.98, Type: typ}}, nil
 }

@@ -98,3 +98,50 @@ function showError(msg) {
     '<div class="detail">' + esc(msg || '未知错误') + '</div>';
 }
 function hideError() { $('error-box').classList.add('hidden'); }
+
+/* ---- 热门板块（chip） ---- */
+function renderHotSectors(items) {
+  const el = $('hot-sectors');
+  if (!items || !items.length) { $('hot-sectors-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    html += '<span class="hot-chip"><span class="hn">' + esc(it.name) + '</span>' +
+      '<span class="hp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
+  }
+  el.innerHTML = html;
+  $('hot-sectors-card').classList.remove('hidden');
+}
+
+/* ---- 热门股票（行，点击查询） ---- */
+function renderHotStocks(items) {
+  const el = $('hot-stocks');
+  if (!items || !items.length) { $('hot-stocks-card').classList.add('hidden'); return; }
+  let html = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
+      '<span class="sn">' + esc(it.name) + '</span>' +
+      '<span class="sc">' + esc(it.code) + '</span>' +
+      '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +
+      '<span class="spct ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '</div>';
+  }
+  el.innerHTML = html;
+  $('hot-stocks-card').classList.remove('hidden');
+}
+
+/* ---- ticker 行情条 ---- */
+function renderTicker(items) {
+  const el = $('ticker-bar');
+  if (!items || !items.length) { el.innerHTML = ''; return; }
+  let html = '';
+  for (const it of items) {
+    const up = (it.change_pct || 0) >= 0;
+    html += '<span class="ticker-item" onclick="hotSearch(\'' + esc(it.name) + '\')">' +
+      '<span class="tn">' + esc(it.name) + '</span>' +
+      '<span class="tp ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
+      '</span>';
+  }
+  el.innerHTML = html;
+}

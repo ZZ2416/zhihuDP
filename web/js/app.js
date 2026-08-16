@@ -136,3 +136,26 @@ $('stock-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { hideSuggest(); doSearch(); }
 });
 window.addEventListener('load', () => $('stock-input').focus());
+
+/* ---- 首页热门加载（ticker + 板块/股票卡片，失败静默） ---- */
+async function loadHomeHot() {
+  try {
+    const [stocks, sectors] = await Promise.all([apiHot('stock', 10), apiHot('sector', 8)]);
+    renderTicker(stocks || []);
+    renderHotStocks(stocks || []);
+    renderHotSectors(sectors || []);
+  } catch (e) { /* 静默降级：热门不阻塞搜索 */ }
+}
+
+/* 点击热门股票 → 直接查询 */
+function hotSearch(name) {
+  $('stock-input').value = name;
+  hideSuggest();
+  doSearch();
+}
+
+/* 首页初始化：热门 + 输入框聚焦 */
+window.addEventListener('load', () => {
+  $('stock-input').focus();
+  loadHomeHot();
+});

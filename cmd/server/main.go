@@ -12,6 +12,7 @@ import (
 
 	"zhihudp/internal/agent"
 	"zhihudp/internal/config"
+	"zhihudp/internal/hot"
 	"zhihudp/internal/kline"
 	"zhihudp/internal/news"
 	"zhihudp/internal/sentiment"
@@ -48,6 +49,7 @@ func main() {
 		resolverFunc(stock.Resolve),
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
+		hotProviderFunc(hot.GetHot),
 		web.FS, // 前端资源（go:embed 内嵌）
 	)
 
@@ -77,6 +79,7 @@ var (
 	_ server.Resolver      = (resolverFunc)(nil)
 	_ server.KlineProvider = (klineProviderFunc)(nil)
 	_ server.NewsProvider  = (newsProviderFunc)(nil)
+	_ server.HotProvider   = (hotProviderFunc)(nil)
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -91,6 +94,13 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
+}
+
+// hotProviderFunc 适配器：函数实现 → server.HotProvider 接口
+type hotProviderFunc func(ctx context.Context, typ string, count int) ([]types.HotItem, error)
+
+func (f hotProviderFunc) GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error) {
+	return f(ctx, typ, count)
 }
 
 // buildDeps 组装 agent 依赖（业务层接线点）
