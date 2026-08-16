@@ -1,82 +1,230 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>zhihuDP — 知乎股票情绪分析</title>
+<title>zhihuDP · 知乎股票情绪分析</title>
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --border:#e4e7ec; --text:#1f2329; --sub:#86909c; --bull:#f5222d; --bear:#389e0d; --neutral:#86909c; --accent:#1664ff; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
-  .wrap { max-width:880px; margin:0 auto; padding:24px 16px 80px; }
-  header { display:flex; align-items:baseline; gap:12px; margin-bottom:20px; }
-  header h1 { font-size:22px; }
-  header .tag { font-size:12px; color:var(--sub); }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:16px; }
-  .search { display:flex; gap:10px; }
-  .search input { flex:1; padding:10px 14px; font-size:15px; border:1px solid var(--border); border-radius:8px; outline:none; }
-  .search input:focus { border-color:var(--accent); }
-  .search button { padding:10px 24px; font-size:15px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; }
-  .search button:disabled { opacity:.5; cursor:not-allowed; }
-  .hint { margin-top:12px; font-size:13px; color:var(--sub); }
-  .stock-head { display:flex; align-items:baseline; gap:10px; }
-  .stock-head .name { font-size:20px; font-weight:600; }
-  .stock-head .code { color:var(--sub); font-size:14px; }
-  .stock-head .market { font-size:12px; background:#f0f2f5; padding:2px 8px; border-radius:4px; color:var(--sub); }
-  .section-title { font-size:15px; font-weight:600; margin-bottom:14px; }
-  .heat { display:flex; align-items:baseline; gap:8px; margin-bottom:16px; }
-  .heat .num { font-size:28px; font-weight:700; }
-  .heat .label { color:var(--sub); font-size:13px; }
-  .ratio-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .ratio-row .rlabel { width:56px; font-size:13px; }
-  .bar { flex:1; height:10px; background:#f0f2f5; border-radius:5px; overflow:hidden; }
-  .bar > div { height:100%; border-radius:5px; }
-  .ratio-row .rpct { width:48px; text-align:right; font-size:13px; color:var(--sub); }
-  .bull { background:var(--bull); } .bear { background:var(--bear); } .neutral { background:var(--neutral); }
-  .score-box { display:flex; align-items:center; gap:14px; margin-top:14px; }
-  .score-num { font-size:34px; font-weight:700; line-height:1; }
-  .score-num.low { color:#8c8c8c; } .score-num.mid { color:#d4a017; } .score-num.high { color:#d4380d; }
-  .score-note { font-size:12px; color:var(--sub); max-width:420px; }
-  .items { margin-top:16px; }
-  .item { padding:12px 0; border-top:1px solid var(--border); }
-  .item a { font-size:14px; color:var(--accent); text-decoration:none; font-weight:500; }
-  .item a:hover { text-decoration:underline; }
-  .item .meta { margin-top:6px; font-size:12px; color:var(--sub); display:flex; gap:12px; }
-  .tag-sentiment { font-size:11px; padding:1px 8px; border-radius:10px; }
-  .tag-sentiment.bull { color:var(--bull); background:#fff1f0; }
-  .tag-sentiment.bear { color:var(--bear); background:#f6ffed; }
-  .tag-sentiment.neutral { color:var(--neutral); background:#f0f2f5; }
-  .degraded { background:#fffbe6; border:1px solid #ffe58f; color:#874d00; padding:12px 16px; border-radius:8px; font-size:13px; margin-top:12px; }
-  #analysis { white-space:pre-wrap; line-height:1.8; font-size:14px; min-height:40px; }
-  .blink { display:inline-block; width:8px; height:16px; background:var(--accent); animation:blink 1s infinite; vertical-align:middle; }
-  @keyframes blink { 50% { opacity:0; } }
-  .err { background:#fff1f0; border:1px solid #ffa39e; color:#cf1322; padding:12px 16px; border-radius:8px; font-size:13px; }
-  footer { margin-top:24px; text-align:center; font-size:12px; color:var(--sub); }
-  .hidden { display:none; }
-  .back { display:inline-block; margin-bottom:12px; font-size:13px; color:var(--accent); cursor:pointer; text-decoration:none; }
+  /* ===== 知乎看山风格设计系统（明暗双主题） ===== */
+  :root {
+    --bg: #f6f8fb; --bg-grad-a: #eaf3ff; --bg-grad-b: #f6f8fb;
+    --card: #ffffff; --card-soft: #f2f6fc;
+    --border: #e4e9f2; --shadow: 0 2px 12px rgba(0,30,80,.06);
+    --text: #1f2329; --sub: #7d8aa0; --faint: #a8b3c5;
+    --accent: #0084FF; --accent-weak: #e8f3ff; --accent-deep: #0066cc;
+    --bull: #f5222d; --bull-bg: #fff1f0;
+    --bear: #389e0d; --bear-bg: #f6ffed;
+    --neutral: #86909c; --neutral-bg: #f0f2f5;
+    --warn-bg: #fffbe6; --warn-border: #ffe58f; --warn-text: #874d00;
+    --err-bg: #fff1f0; --err-border: #ffa39e; --err-text: #cf1322;
+  }
+  [data-theme="dark"] {
+    --bg: #101418; --bg-grad-a: #131c28; --bg-grad-b: #101418;
+    --card: #1b2129; --card-soft: #202934;
+    --border: #2d3742; --shadow: 0 2px 14px rgba(0,0,0,.4);
+    --text: #e8edf3; --sub: #8b99a8; --faint: #5c6b7a;
+    --accent: #4d9fff; --accent-weak: #1c2f45; --accent-deep: #6db1ff;
+    --bull: #ff6b75; --bull-bg: #3a2226;
+    --bear: #5fca3c; --bear-bg: #1d2e1a;
+    --neutral: #8b99a8; --neutral-bg: #262e38;
+    --warn-bg: #332c14; --warn-border: #6b5b1e; --warn-text: #e8c468;
+    --err-bg: #3a2020; --err-border: #6b2c2c; --err-text: #ff8f85;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: linear-gradient(180deg, var(--bg-grad-a) 0, var(--bg-grad-b) 260px);
+    background-color: var(--bg); color: var(--text);
+    min-height: 100vh; transition: background .3s, color .3s;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ===== 顶栏 ===== */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 920px; margin: 0 auto; padding: 14px 20px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(10px);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+  .logo .whale { width: 34px; height: 30px; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .tag { font-size: 12px; color: var(--sub); }
+  #theme-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: transform .2s;
+  }
+  #theme-btn:hover { transform: scale(1.08); }
+
+  /* ===== 布局 ===== */
+  .wrap { max-width: 880px; margin: 0 auto; padding: 12px 16px 40px; }
+
+  /* ===== 搜索视图 ===== */
+  .hero { text-align: center; padding: 46px 0 26px; }
+  .hero .big-whale { width: 110px; height: 96px; margin: 0 auto 14px; animation: float 4s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .hero h2 { font-size: 26px; margin-bottom: 8px; }
+  .hero p { color: var(--sub); font-size: 14px; }
+
+  .search-card { padding: 24px; }
+  .search { display: flex; gap: 10px; position: relative; }
+  .search input {
+    flex: 1; padding: 12px 16px; font-size: 15px; border: 1.5px solid var(--border);
+    border-radius: 10px; outline: none; background: var(--card); color: var(--text); transition: border-color .2s, box-shadow .2s;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+  .search button {
+    padding: 0 28px; font-size: 15px; font-weight: 600; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; cursor: pointer; transition: background .2s, transform .1s;
+  }
+  .search button:hover { background: var(--accent-deep); }
+  .search button:active { transform: scale(.97); }
+  .search button:disabled { opacity: .55; cursor: not-allowed; }
+
+  .suggest { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); overflow: hidden; }
+  .suggest-item { padding: 10px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+  .suggest-item:hover { background: var(--card-soft); }
+  .suggest-item .code { color: var(--sub); font-size: 12px; }
+  .suggest-item .market { font-size: 11px; background: var(--accent-weak); color: var(--accent); padding: 1px 8px; border-radius: 10px; margin-left: auto; }
+
+  .hint { margin-top: 14px; font-size: 12px; color: var(--faint); text-align: center; }
+
+  /* ===== 卡片 ===== */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .view { animation: fadeUp .35s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .back { display: inline-block; margin: 6px 0 14px; font-size: 13px; color: var(--sub); cursor: pointer; }
+  .back:hover { color: var(--accent); }
+
+  .stock-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .stock-head .name { font-size: 22px; font-weight: 700; }
+  .stock-head .code { color: var(--sub); font-size: 14px; font-family: ui-monospace, Menlo, monospace; }
+  .stock-head .market { font-size: 12px; background: var(--accent-weak); color: var(--accent); padding: 2px 10px; border-radius: 12px; }
+  .stock-head .fresh { margin-left: auto; font-size: 12px; color: var(--faint); }
+
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section-title::before { content: ""; width: 4px; height: 15px; border-radius: 2px; background: var(--accent); }
+
+  /* 情绪面板 */
+  .degraded { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; }
+  .heat { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; }
+  .heat .num { font-size: 30px; font-weight: 800; color: var(--accent); }
+  .heat .label { color: var(--sub); font-size: 13px; }
+  .heat .sample { margin-left: auto; font-size: 12px; color: var(--faint); }
+  .ratio-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .ratio-row .rlabel { width: 60px; font-size: 13px; color: var(--sub); }
+  .bar { flex: 1; height: 12px; background: var(--card-soft); border-radius: 6px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 6px; transition: width .6s ease; }
+  .bull { background: var(--bull); } .bear { background: var(--bear); } .neutral { background: var(--neutral); }
+  .ratio-row .rpct { width: 50px; text-align: right; font-size: 13px; font-weight: 600; }
+
+  .score-box { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
+  .score-num { font-size: 38px; font-weight: 800; line-height: 1; }
+  .score-num.low { color: var(--neutral); } .score-num.mid { color: #d4a017; } .score-num.high { color: var(--bull); }
+  [data-theme="dark"] .score-num.mid { color: #e8c468; }
+  .score-note { font-size: 12px; color: var(--faint); line-height: 1.6; }
+
+  .items { margin-top: 16px; }
+  .item { padding: 13px 2px; border-top: 1px solid var(--border); }
+  .item:first-child { border-top: none; }
+  .item .title-line { display: flex; align-items: center; gap: 8px; }
+  .item a { font-size: 14px; font-weight: 600; color: var(--text); }
+  .item a:hover { color: var(--accent); text-decoration: none; }
+  .tag-sentiment { font-size: 11px; padding: 1px 9px; border-radius: 10px; white-space: nowrap; }
+  .tag-sentiment.bull { color: var(--bull); background: var(--bull-bg); }
+  .tag-sentiment.bear { color: var(--bear); background: var(--bear-bg); }
+  .tag-sentiment.neutral { color: var(--neutral); background: var(--neutral-bg); }
+  .item .meta { margin-top: 5px; font-size: 12px; color: var(--faint); display: flex; gap: 14px; }
+  .item .excerpt { margin-top: 5px; font-size: 12px; color: var(--sub); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* AI 分析（markdown 渲染） */
+  #analysis { font-size: 14px; line-height: 1.85; min-height: 40px; }
+  #analysis h1, #analysis h2, #analysis h3 { margin: 14px 0 6px; line-height: 1.4; }
+  #analysis h1 { font-size: 17px; } #analysis h2 { font-size: 16px; } #analysis h3 { font-size: 15px; }
+  #analysis p { margin: 6px 0; }
+  #analysis ul { margin: 6px 0 6px 20px; }
+  #analysis li { margin: 4px 0; }
+  #analysis hr { border: none; border-top: 1px dashed var(--border); margin: 12px 0; }
+  #analysis strong { color: var(--accent-deep); }
+  #analysis a { word-break: break-all; }
+  #analysis code { background: var(--card-soft); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .blink { display: inline-block; width: 8px; height: 16px; background: var(--accent); animation: blink 1s infinite; vertical-align: -2px; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .err-box { background: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-text); padding: 14px 18px; border-radius: 12px; font-size: 13px; }
+  .err-box .detail { margin-top: 6px; font-size: 12px; color: var(--sub); word-break: break-all; }
+
+  /* ===== 页脚 ===== */
+  footer { max-width: 880px; margin: 26px auto 40px; padding: 0 16px; text-align: center; font-size: 12px; color: var(--faint); }
+  .foot-links { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; }
+  .foot-links a { color: var(--sub); }
+  .foot-links a:hover { color: var(--accent); text-decoration: none; }
+  .foot-links .dot { color: var(--faint); }
+  footer p { margin: 3px 0; }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 560px) {
+    .hero { padding-top: 26px; } .hero h2 { font-size: 21px; }
+    .tag { display: none; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>zhihuDP</h1>
-    <span class="tag">知乎股票情绪分析 · 仅展示信息，不构成投资建议</span>
-  </header>
+
+<header>
+  <div class="logo">
+    <svg class="whale" viewBox="0 0 64 48" aria-hidden="true">
+      <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
+      <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
+      <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
+      <circle cx="34" cy="18" r="2.6" fill="#fff"/>
+      <path d="M30 25 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+    <span>zhihuDP</span>
+  </div>
+  <div class="header-right">
+    <span class="tag">知乎股票情绪分析 · 信息工具</span>
+    <button id="theme-btn" title="切换明暗主题" onclick="toggleTheme()">🌙</button>
+  </div>
+</header>
+
+<main class="wrap">
 
   <!-- 搜索视图 -->
-  <div id="view-search">
-    <div class="card">
+  <section id="view-search" class="view">
+    <div class="hero">
+      <svg class="big-whale" viewBox="0 0 64 48" aria-hidden="true">
+        <path d="M10 24 C4 16 2 10 4 6 c6 4 9 10 9 16z" fill="var(--accent)"/>
+        <path d="M10 24 C4 32 2 38 4 42 c6-4 9-10 9-16z" fill="var(--accent)"/>
+        <path d="M14 22 c0-8 7-14 16-14 h12 c10 0 18 6 18 14 c0 8-8 14-18 14 h-12 c-9 0-16-6-16-14z" fill="var(--accent)"/>
+        <path d="M34 18 c2.5-1 5-1.5 7.5-1.5" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <circle cx="27" cy="17" r="2.6" fill="#fff"/>
+        <path d="M23 24 c2 2 5 2 7 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M22 8 c-2-3-6-4-8-3 M24 7 c-1-4-4-6-8-6 M26 9 c0-5-4-8-9-8" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <h2>看看知乎上大家在聊什么</h2>
+      <p>输入股票名称或代码，查看讨论热度、多空情绪与 AI 解读</p>
+    </div>
+    <div class="card search-card">
       <div class="search">
-        <input id="stock-input" placeholder="输入股票名称或代码，如：茅台 / 600519" onkeydown="if(event.key==='Enter')doSearch()">
+        <input id="stock-input" placeholder="股票名称或代码，如：茅台 / 600519" autocomplete="off" spellcheck="false">
         <button id="search-btn" onclick="doSearch()">查询</button>
       </div>
-      <div class="hint">数据来源：知乎公开讨论（实时检索）· 情绪数据由 AI 自动分类，仅供参考</div>
+      <div id="suggest" class="suggest hidden"></div>
+      <div class="hint">数据来源：知乎公开讨论 · 情绪由 AI 自动分类 · 仅供参考</div>
     </div>
-  </div>
+  </section>
 
   <!-- 详情视图 -->
-  <div id="view-detail" class="hidden">
-    <a class="back" href="#/" onclick="showSearch();return false;">← 返回查询</a>
+  <section id="view-detail" class="view hidden">
+    <a class="back" onclick="showSearch()">← 返回查询</a>
 
     <div class="card">
       <div class="stock-head" id="stock-head"></div>
@@ -84,89 +232,138 @@
 
     <div class="card">
       <div class="section-title">情绪面板</div>
-      <div id="sentiment-body"><span style="color:var(--sub)">正在分析…</span></div>
+      <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
     </div>
 
     <div class="card">
       <div class="section-title">AI 分析</div>
-      <div id="analysis"></div><span id="cursor" class="blink hidden"></span>
+      <div id="analysis"></div><span id="cursor" class="blink"></span>
     </div>
 
-    <div class="card hidden" id="error-box"></div>
+    <div id="error-box" class="card hidden"><div class="err-box"></div></div>
+  </section>
 
-    <footer>
-      本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。据此操作，风险自担。<br>
-      参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。
-    </footer>
-  </div>
+</main>
 
-  <!-- 搜索视图也有免责声明 -->
-  <div id="view-search-footer" style="margin-top:24px;text-align:center;font-size:12px;color:var(--sub);">
-    本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。
+<footer>
+  <div class="foot-links">
+    <a href="https://github.com/ZZ2416" target="_blank" rel="noopener">GitHub 主页</a>
+    <span class="dot">·</span>
+    <span>创作者：zhangzhi</span>
+    <span class="dot">·</span>
+    <a href="https://github.com/ZZ2416/zhihuDP/issues" target="_blank" rel="noopener">联系与反馈</a>
   </div>
-</div>
+  <p>本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。据此操作，风险自担。</p>
+  <p>参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。</p>
+</footer>
 
 <script>
 const $ = id => document.getElementById(id);
 
+/* ===== 主题切换（localStorage + 系统偏好） ===== */
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('zhihudp-theme', t);
+  $('theme-btn').textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+(function initTheme() {
+  const saved = localStorage.getItem('zhihudp-theme');
+  const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (preferDark ? 'dark' : 'light'));
+})();
+
+/* ===== 视图切换 ===== */
 function showDetail() {
   $('view-search').classList.add('hidden');
-  $('view-search-footer').classList.add('hidden');
   $('view-detail').classList.remove('hidden');
+  window.scrollTo({ top: 0 });
 }
 function showSearch() {
   $('view-detail').classList.add('hidden');
   $('view-search').classList.remove('hidden');
-  $('view-search-footer').classList.remove('hidden');
 }
 
-// 情绪标签中文
-const sentiLabel = { bull:'看多', bear:'看空', neutral:'中性' };
-const scoreClass = n => n<=3?'low':(n<=7?'mid':'high');
+/* ===== 搜索联想（防抖调用 /api/resolve） ===== */
+let suggestTimer = null;
+$('stock-input').addEventListener('input', () => {
+  const q = $('stock-input').value.trim();
+  clearTimeout(suggestTimer);
+  hideSuggest();
+  if (q.length < 1) return;
+  suggestTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch('/api/resolve?q=' + encodeURIComponent(q));
+      if (!resp.ok) return;
+      const info = await resp.json();
+      if (!info || !info.code) return;
+      const box = $('suggest');
+      box.classList.remove('hidden');
+      box.innerHTML = '<div class="suggest-item" onclick="useSuggestion()">' +
+        '<span class="name">' + esc(info.name) + '</span>' +
+        '<span class="code">' + esc(info.code) + '</span>' +
+        '<span class="market">' + esc(info.market) + '</span></div>';
+      box._stock = info;
+    } catch (e) { /* 忽略联想失败 */ }
+  }, 300);
+});
+function hideSuggest() { $('suggest').classList.add('hidden'); }
+function useSuggestion() {
+  const info = $('suggest')._stock;
+  if (!info) return;
+  $('stock-input').value = info.name;
+  hideSuggest();
+  doSearch();
+}
 
+/* ===== 查询 ===== */
 async function doSearch() {
   const stock = $('stock-input').value.trim();
-  if (!stock) return;
+  if (!stock) { $('stock-input').focus(); return; }
   const btn = $('search-btn');
   btn.disabled = true;
+  hideSuggest();
 
-  // 重置详情区
   $('stock-head').innerHTML = '';
-  $('sentiment-body').innerHTML = '<span style="color:var(--sub)">正在分析…</span>';
-  $('analysis').textContent = '';
-  $('error-box').classList.add('hidden');
+  $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
+  $('analysis').innerHTML = '';
+  analysisText = '';
+  hideError();
   $('cursor').classList.remove('hidden');
   showDetail();
 
   try {
     const resp = await fetch('/api/ask', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({stock})
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stock })
     });
     if (!resp.ok) {
-      const j = await resp.json().catch(()=>({}));
+      const j = await resp.json().catch(() => ({}));
       showError(j.error || ('HTTP ' + resp.status));
       return;
     }
     await readSSE(resp, handleEvent);
+    flushAnalysis(); // 收尾渲染
   } catch (e) {
-    showError('请求失败：' + e.message);
+    showError('网络异常：' + e.message);
   } finally {
     btn.disabled = false;
     $('cursor').classList.add('hidden');
   }
 }
 
-// 手写 SSE 解析：fetch + ReadableStream
+/* ===== SSE 解析 ===== */
 async function readSSE(resp, handler) {
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   while (true) {
-    const {done, value} = await reader.read();
+    const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, {stream:true});
+    buffer += decoder.decode(value, { stream: true });
     let idx;
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
       const block = buffer.slice(0, idx);
@@ -187,85 +384,124 @@ function handleEvent(event, data) {
   switch (event) {
     case 'stock':
       $('stock-head').innerHTML =
-        '<span class="name">' + esc(d.name||'') + '</span>' +
-        '<span class="code">' + esc(d.code||'') + '</span>' +
-        '<span class="market">' + esc(d.market||'') + '</span>' +
-        '<span style="margin-left:auto;font-size:12px;color:var(--sub)">实时检索</span>';
+        '<span class="name">' + esc(d.name || '') + '</span>' +
+        '<span class="code">' + esc(d.code || '') + '</span>' +
+        '<span class="market">' + esc(d.market || '') + '</span>' +
+        '<span class="fresh">实时检索</span>';
       break;
-    case 'sentiment':
-      renderSentiment(d);
-      break;
-    case 'delta':
-      $('analysis').textContent += d.text || '';
-      break;
-    case 'error':
-      showError(d.message || '发生错误');
-      break;
-    case 'done':
-      break;
+    case 'sentiment': renderSentiment(d); break;
+    case 'delta': appendDelta(d.text || ''); break;
+    case 'error': showError(d.message || '发生错误'); break;
+    case 'done': break;
   }
 }
+
+/* ===== 情绪面板 ===== */
+const sentiLabel = { bull: '看多', bear: '看空', neutral: '中性' };
+const scoreClass = n => n <= 3 ? 'low' : (n <= 7 ? 'mid' : 'high');
 
 function renderSentiment(s) {
   if (!s) return;
   let html = '';
-
-  // 降级
   if (s.degraded) {
     html += '<div class="degraded">' + esc(s.err_msg || '数据不足，已降级展示') + '</div>';
   }
+  html += '<div class="heat"><span class="num">' + (s.heat || 0) + '</span>' +
+    '<span class="label">条近期讨论</span>' +
+    '<span class="sample">样本 ' + (s.sample || 0) + ' 条</span></div>';
 
-  // 热度
-  html += '<div class="heat"><span class="num">' + (s.heat||0) + '</span><span class="label">条近期讨论</span>' +
-          '<span style="margin-left:auto;font-size:12px;color:var(--sub)">样本 ' + (s.sample||0) + ' 条</span></div>';
-
-  // 多空占比
   const r = s.ratio || {};
-  const pct = x => Math.round((x||0)*100) + '%';
+  const pct = x => Math.round((x || 0) * 100) + '%';
   html += ratioRow('看多', 'bull', r.bull) + ratioRow('看空', 'bear', r.bear) + ratioRow('中性', 'neutral', r.neutral);
 
-  // 参考强度分
   if (s.score != null) {
     html += '<div class="score-box">' +
-      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--sub)">/10</small></span>' +
+      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--faint)">/10</small></span>' +
       '<span class="score-note">参考强度：反映当前讨论情绪与数据的充分程度，不代表涨跌预测。</span></div>';
   }
 
-  // 代表观点
   const items = s.items || [];
   if (items.length) {
-    html += '<div class="section-title" style="margin-top:16px">代表观点</div><div class="items">';
+    html += '<div class="section-title" style="margin-top:18px">代表观点</div><div class="items">';
     for (const it of items) {
       html += '<div class="item">' +
-        '<a href="' + esc(it.url||'#') + '" target="_blank" rel="noopener">' + esc(it.title||'(无标题)') + '</a>' +
-        '<span class="tag-sentiment ' + esc(it.sentiment||'neutral') + '">' + esc(sentiLabel[it.sentiment]||'中性') + '</span>' +
-        '<div class="meta"><span>' + esc(it.author||'匿名') + '</span><span>赞同 ' + (it.vote_up||0) + '</span></div>' +
-        '<div style="font-size:12px;color:var(--sub);margin-top:4px">' + esc((it.excerpt||'').slice(0,80)) + '</div>' +
+        '<div class="title-line">' +
+        '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '(无标题)') + '</a>' +
+        '<span class="tag-sentiment ' + esc(it.sentiment || 'neutral') + '">' + esc(sentiLabel[it.sentiment] || '中性') + '</span>' +
+        '</div>' +
+        '<div class="meta"><span>✍️ ' + esc(it.author || '匿名') + '</span><span>👍 ' + (it.vote_up || 0) + '</span></div>' +
+        '<div class="excerpt">' + esc(it.excerpt || '') + '</div>' +
         '</div>';
     }
     html += '</div>';
   }
-
   $('sentiment-body').innerHTML = html;
 }
 
 function ratioRow(label, cls, val) {
-  const p = Math.round((val||0)*100);
+  const p = Math.round((val || 0) * 100);
   return '<div class="ratio-row"><span class="rlabel">' + label + '</span>' +
     '<div class="bar"><div class="' + cls + '" style="width:' + p + '%"></div></div>' +
     '<span class="rpct">' + p + '%</span></div>';
 }
 
+/* ===== AI 分析（markdown 轻渲染 + 防抖） ===== */
+let analysisText = '';
+let renderTimer = null;
+function appendDelta(text) {
+  analysisText += text;
+  if (renderTimer) return;
+  renderTimer = setTimeout(() => { renderTimer = null; $('analysis').innerHTML = renderMarkdown(analysisText); }, 80);
+}
+function flushAnalysis() {
+  if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+  $('analysis').innerHTML = renderMarkdown(analysisText);
+}
+function mdInline(s) {
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return s;
+}
+function renderMarkdown(text) {
+  let html = '', listOpen = false;
+  const closeList = () => { if (listOpen) { html += '</ul>'; listOpen = false; } };
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+    if (/^-{3,}/.test(line)) { closeList(); html += '<hr>'; continue; }
+    let m = line.match(/^(#{1,4})\s+(.*)/);
+    if (m) { closeList(); const lvl = m[1].length; html += '<h' + lvl + '>' + mdInline(m[2]) + '</h' + lvl + '>'; continue; }
+    if (/^[-*•]\s+/.test(line)) { if (!listOpen) { html += '<ul>'; listOpen = true; } html += '<li>' + mdInline(line.replace(/^[-*•]\s+/, '')) + '</li>'; continue; }
+    m = line.match(/^\d+[.、]\s+(.*)/);
+    if (m) { if (!listOpen) { html += '<ul>'; listOpen = true; } html += '<li>' + mdInline(m[1]) + '</li>'; continue; }
+    closeList();
+    html += '<p>' + mdInline(line) + '</p>';
+  }
+  closeList();
+  return html;
+}
+
+/* ===== 错误 ===== */
 function showError(msg) {
   const box = $('error-box');
   box.classList.remove('hidden');
-  box.innerHTML = '<strong>😥 出错了，请稍后重试。</strong>' +
-    '<div style="margin-top:6px;font-size:12px;color:var(--sub)">' + esc(msg || '未知错误') + '</div>';
+  box.querySelector('.err-box').innerHTML =
+    '<strong>😥 出错了，请稍后重试。</strong>' +
+    '<div class="detail">' + esc(msg || '未知错误') + '</div>';
+}
+function hideError() { $('error-box').classList.add('hidden'); }
+
+/* ===== 工具 ===== */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+/* 回车查询 */
+$('stock-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { hideSuggest(); doSearch(); }
+});
+window.addEventListener('load', () => $('stock-input').focus());
 </script>
 </body>
 </html>
