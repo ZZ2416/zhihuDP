@@ -1,10 +1,10 @@
 # 知乎股票情绪分析工具 — 技术设计
 
-> 版本：v1.1
+> 版本：v1.2
 > 日期：2026-08-16
 > 状态：初稿待评审
 > 关联文档：`business-design.md`（业务设计文档 v1.0，规则与验收准绳）；`product-design.md`（产品设计稿 v0.1）
-> 变更：v1.1 解耦旧 design.md（已废弃，不再引用），对齐业务设计 §4 规则与 §6 验收标准
+> 变更：v1.1 解耦旧 design.md（已废弃，不再引用），对齐业务设计 §4 规则与 §6 验收标准；v1.2 目录结构升级为标准 cmd/internal 布局（依赖注入、go:embed 前端）
 
 ---
 
@@ -37,42 +37,58 @@ stock.go / zhihu.go / sentiment.go / compliance.go（独立模块）
 
 ### 2.1 项目架构定义（M0 落地依据）
 
-**① 项目目录结构**
+**① 项目目录结构（标准 cmd/internal 布局，v1.2 重构）**
 
 ```
-project-root/
-├── go.mod / go.sum
-├── main.go            # 入口：LoadConfig → 注册路由 → 启动 :8080
-├── config.go          # 配置加载（yaml + env 覆盖），无内部依赖
-├── types.go           # 共享数据结构：StockInfo / SentimentResult / SSE Event 类型
-├── stock.go           # 股票识别客户端（东财主 + 腾讯兜底），依赖 config
-├── zhihu.go           # 知乎搜索客户端，依赖 config
-├── sentiment.go       # 情绪分析编排，依赖 zhihu.go + config
-├── agent.go           # ADK agent 组装 + 事件分发，依赖 sentiment/stock/config/types
-├── compliance.go      # 合规过滤，无内部依赖
-└── static/
-    └── index.html     # 前端：单文件双视图（hash 路由）
+zhihuDP/
+├── cmd/
+│   └── server/
+│       └── main.go              # 入口：config.Load → buildDeps 组装 → 路由 → 启动；含 CLI 模式(-q)
+├── internal/
+│   ├── config/
+│   │   └── config.go            # Config / Load（yaml + env 覆盖 + 默认值 + 脱敏），独立包
+│   ├── types/
+│   │   └── types.go             # StockInfo / SentimentResult / Ratio / ViewItem / Event
+│   ├── stock/
+│   │   └── stock.go             # Resolve（东财主 + 腾讯兜底），无配置依赖
+│   ├── zhihu/
+│   │   └── zhihu.go             # Client.New(cfg) + (c *Client).Search，知乎搜索
+│   ├── sentiment/
+│   │   └── sentiment.go         # Analyze(ctx, code, name, zh *zhihu.Client, ds config.DeepSeekConfig)
+│   ├── agent/
+│   │   └── agent.go             # Deps 依赖注入 + RunAnalysis(ctx, query, deps, sink)
+│   ├── compliance/
+│   │   └── compliance.go        # Filter（流式块级）/ FilterFinal（完整文本句级）
+│   └── web/
+│       ├── embed.go             # //go:embed index.html（前端内嵌，不依赖运行目录）
+│       └── index.html           # 前端：单文件双视图（搜索页 + 详情页）
+├── docs/
+│   └── CHANGELOG.md
+├── config.example.yaml
+├── .gitignore
+└── go.mod / go.sum
 ```
 
-**② 模块依赖（import 方向，单向无环）**
+**② 模块依赖（import 方向，单向无环；依赖注入避免全局状态）**
 
 ```
-types.go      ◄── 全部模块
-config.go     ◄── main / stock / zhihu / sentiment / agent
-stock.go      ◄── main（探针）/ agent（工具）
-zhihu.go      ◄── sentiment
-sentiment.go  ◄── agent
-compliance.go ◄── main（SSE 转发前过滤）
-agent.go      ◄── main
+internal/types       ◄── 全部业务包
+internal/config      ◄── cmd/server / sentiment / agent / zhihu
+internal/stock       ◄── cmd/server（探针）/ agent.Deps
+internal/zhihu       ◄── cmd/server（组装）/ sentiment.Analyze 入参
+internal/sentiment   ◄── cmd/server（buildDeps 注入）
+internal/compliance  ◄── internal/agent（delta 过滤）
+internal/agent       ◄── cmd/server（RunAnalysis）
+internal/web         ◄── cmd/server（go:embed 前端）
 ```
 
-**③ 并发模型**：单进程；每个 `/api/ask` 一个 goroutine，各自创建独立 agent/runner 实例（无共享可变状态，天然并发安全）；唯一共享的是只读 `cfg`（启动加载后不变）；无 DB/缓存/队列。
+**③ 并发模型**：单进程；每个 `/api/ask` 一个 goroutine，各自创建独立 agent/runner 实例（无共享可变状态，天然并发安全）；各包**无全局变量**（依赖经 `buildDeps` 显式注入）；无 DB/缓存/队列。
 
-**④ 配置流向**：`main()` 调 `LoadConfig("config.yaml")` → 包级只读 `cfg` → stock/zhihu/sentiment/agent 各自读取所需字段。
+**④ 配置流向**：`cmd/server` 调 `config.Load("config.yaml")` → `buildDeps(cfg)` 组装 `zhihu.Client` + `sentiment.Analyze` 闭包 + `agent.Deps` → 各包经入参取所需配置。
 
-**⑤ 前端结构**：单文件 `index.html` 双视图（hash 路由：`#/` 搜索页、`#/stock/600519` 详情页），`fetch` + `ReadableStream` 解析 SSE；无构建。
+**⑤ 前端结构**：单文件 `index.html` 双视图（搜索页 `#/` + 详情页），`fetch` + `ReadableStream` 解析 SSE；经 `//go:embed` 内嵌，无构建、不依赖运行目录。
 
-**⑥ 运行形态与使用流程（本地单机部署）**：一台电脑即可使用。用户三步：① 复制 `config.example.yaml` 为 `config.yaml` 并填入自己的密钥；② `go run .`（或编译后运行）启动；③ 浏览器访问 `http://localhost:8080`。无外部服务、无部署步骤、密钥只在本机配置文件里。
+**⑥ 运行形态与使用流程（本地单机部署）**：一台电脑即可使用。用户三步：① 复制 `config.example.yaml` 为 `config.yaml` 并填入自己的密钥；② `go run ./cmd/server`（或编译后运行）启动；③ 浏览器访问 `http://localhost:8080`。无外部服务、无部署步骤、密钥只在本机配置文件里。
 
 ### 2.2 主流程时序（含降级分支）
 
@@ -149,22 +165,23 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 ### 3.1 模块划分与依赖
 
-| 文件 | 职责 | 依赖 |
+| 包/文件 | 职责 | 依赖 |
 |---|---|---|
-| `main.go` | HTTP 路由、SSE 写入、工具事件解析、合规过滤编排 | 全部 |
-| `config.go` | 配置文件加载（YAML 解析 + env 覆盖 + 默认值） | gopkg.in/yaml.v3 |
-| `types.go` | 共享数据结构（StockInfo / SentimentResult / SSE Event 类型） | 无 |
-| `agent.go` | 组装 ADK agent、事件分发 | eino/adk、eino-ext/deepseek |
-| `stock.go` | 股票识别客户端（东财主 + 腾讯兜底） | net/http，零第三方 |
-| `zhihu.go` | 知乎搜索客户端（独立契约，见 §3.2） | net/http + json |
-| `sentiment.go` | 情绪分析编排：搜索→LLM 分类→规则强度分 | zhihu.go、eino-ext/deepseek |
-| `compliance.go` | 禁用词过滤 | 无 |
+| `cmd/server/main.go` | 入口：配置加载、`buildDeps` 组装、路由（SSE/探针/前端）、CLI 模式 | 全部 internal 包 |
+| `internal/config` | 配置加载（YAML + env 覆盖 + 默认值 + 脱敏） | gopkg.in/yaml.v3 |
+| `internal/types` | 共享数据结构（StockInfo / SentimentResult / Event 等） | 无 |
+| `internal/stock` | 股票识别（东财主 + 腾讯兜底） | net/http，零第三方 |
+| `internal/zhihu` | 知乎搜索客户端（`Client.Search`，Bearer 鉴权） | net/http + json |
+| `internal/sentiment` | 情绪分析编排：搜索→LLM 分类→规则强度分 | zhihu、eino-ext/deepseek |
+| `internal/agent` | ADK agent 组装 + 事件分发（`Deps` 注入） | eino/adk、eino-ext/deepseek、compliance |
+| `internal/compliance` | 禁用词过滤 | 无 |
+| `internal/web` | 前端资源（go:embed） | 无 |
 
 ### 3.2 内部方法
 
-#### config.go
+#### internal/config
 
-**`func LoadConfig(path string) (*Config, error)`**
+**`func Load(path string) (*Config, error)`**
 - 类型：内部方法；所属模块：`config.go`；调用方：`main()`
 - 职责：加载配置文件（**配置文件模式**，用户复制模板后自定义密钥）
 - 结构：
@@ -188,10 +205,10 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 - 加载优先级：环境变量 > `config.yaml` > 默认值（env 便于 CI/部署注入，不设则忽略）
 - 边界/null：文件不存在 → 用默认值 + 警告；YAML 解析失败 → 报错退出；必填密钥（`AccessSecret`/`APIKey`）缺失 → 启动时警告、调用时明确报错（**不 panic**）；`Config.String()` 脱敏，任何日志不打印 secret
 
-#### stock.go
+#### internal/stock
 
-**`func ResolveStock(ctx context.Context, query string) (*StockInfo, error)`**
-- 类型：内部方法；所属模块：`stock.go`
+**`func Resolve(ctx context.Context, query string) (*StockInfo, error)`**
+- 类型：内部方法；所属模块：`internal/stock`；调用方：`cmd/server`（探针）、agent `Deps.ResolveStock`
 - 职责：股票名称/代码 → 结构化股票信息；东财 suggest 主选，失败/无匹配自动切腾讯 smartbox
 - 入参：`query` 股票名称或代码（如「茅台」「600519」）
 - 出参：`*StockInfo{Code, Name, Market string}`；无匹配时返回 `ErrStockNotFound`
@@ -201,10 +218,10 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 **`func resolveViaEastmoney(ctx, query) (*StockInfo, error)` / `resolveViaTencent(ctx, query) (*StockInfo, error)`**
 - 内部实现函数，封装各自接口与解析；东财：`GET https://searchapi.eastmoney.com/api/suggest/get?input={q}&type=14&count=5`；腾讯：`GET https://smartbox.gtimg.cn/s3/?v=2&q={q}&t=all`（两接口均已实测可用）
 
-#### zhihu.go
+#### internal/zhihu
 
-**`func SearchZhihu(ctx context.Context, query string, count int) (*SearchResponse, error)`**
-- 类型：内部方法；所属模块：`zhihu.go`；调用方：`sentiment.go`
+**`func (c *Client) Search(ctx context.Context, query string, count int) (*SearchResponse, error)`**
+- 类型：内部方法；所属模块：`internal/zhihu`（`New(cfg) *Client` 构造）；调用方：`internal/sentiment`
 - 职责：调用知乎 `zhihu_search` 开放接口
 - 入参：`query` 搜索词；`count` 返回条数，clamp 1–10（默认 10）
 - 出参：`*SearchResponse`（契约如下，字段名以知乎接口实际返回为准，落地时实测微调）：
@@ -229,10 +246,10 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 - 边界/null：缺 `cfg.Zhihu.AccessSecret` → 明确报错（不 panic）；非 2xx → 透传响应体；非 JSON → 解析错误；`Data.Items` 为空 → 返回空 `Items`（非 nil）
 - 关键约束：端点解析优先级 `cfg.Zhihu.SearchURL`（非空时）> `cfg.Zhihu.OpenAPIBaseURL + /api/v1/content/zhihu_search` > 默认 `https://developer.zhihu.com`；请求头 `Authorization: Bearer {secret}` + `X-Request-Timestamp: {unix秒}` + **`Content-Type: application/json`**（官方文档确认）；参数名 `Query`（`--data-urlencode` 语义，GET）；超时 5s；**任何日志不打印 secret**
 
-#### sentiment.go
+#### internal/sentiment
 
-**`func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult, error)`**
-- 类型：内部方法；所属模块：`sentiment.go`；调用方：agent 的 `analyze_sentiment` 工具
+**`func Analyze(ctx context.Context, code, name string, zh *zhihu.Client, ds config.DeepSeekConfig) (*SentimentResult, error)`**
+- 类型：内部方法；所属模块：`internal/sentiment`；调用方：`cmd/server`（`buildDeps` 注入为 agent `Deps.AnalyzeSentiment`）
 - 职责：编排「知乎搜索 → LLM 批量情感分类 → 规则强度分」，产出情绪面板结构化数据
 - 入参：`code` 股票代码（必填）、`name` 股票名称
 - 出参：`*SentimentResult`：
@@ -270,18 +287,19 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 - 规则（已实现定稿，2026-08-16）：`score = clamp( round( 1 + 6*max(bull,bear) + log10(1+sample)/2 + min(heat,50)/100 ), 1, 10 )`（多空一致性主导：五五开≈4-5 分、强一致≈7-9 分；样本/热度仅小幅修正，避免「样本多但分歧大」虚高；配套单测 `TestComputeStrength`）
 - 边界：`sample<5` → 调用方不调用此函数（Score=nil）
 
-#### compliance.go
+#### internal/compliance
 
 **`func Filter(text string) string`**
 - 类型：内部方法；职责：对 AI 输出做禁用词后置校验（产品稿 §8 措辞表）
 - 规则：命中禁用词（买入/卖出/持有/建议/概率/预测/推荐 等，含常见变体如「可以上车」「减仓」）→ 剔除整句（按句号分句后过滤）；过滤后为空 → 返回兜底文案「当前分析暂不可用，请查看情绪面板数据」
 - 边界：空文本 → 原样返回；大小写/中英文混合 → 统一小写后匹配
 
-#### agent.go
+#### internal/agent
 
-**`func newAgent(ctx context.Context) (*adk.ChatModelAgent, error)`**
-- 类型：内部方法；职责：组装 ADK agent
-- 接线（已按本地 eino checkout `ca0441a` 源码核对）：
+**`func RunAnalysis(ctx context.Context, stockQuery string, deps Deps, sink func(Event) error) error`**
+- 类型：内部方法；所属模块：`internal/agent`；调用方：`cmd/server`（HTTP 与 CLI 模式）
+- 依赖注入：`Deps{ResolveStock, AnalyzeSentiment funcs, DeepSeek config.DeepSeekConfig}` 由 `cmd/server.buildDeps` 组装；工具闭包直接捕获 `sink`（结构化事件 `stock`/`sentiment` 在工具内直发，无需 context 传递）
+- 组装（已按 eino v0.9.14 源码核对）：
   ```go
   resolveTool, err := utils.InferTool("resolve_stock",
       "将股票名称或代码解析为股票信息（代码、名称、市场）。",
@@ -318,22 +336,22 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
   ```
 - 边界：任一工具构建失败 → 返回错误，启动时 fail-fast（缺密钥只警告，调用时再报错）
 
-**`func runAnalysis(ctx context.Context, stockQuery string, sink EventSink) error`**
-- 类型：内部方法；职责：运行 agent 并分发事件
-- 入参：`stockQuery` 用户输入；`sink` 回调 `func(Event) error`
+**`func RunAnalysis(ctx context.Context, stockQuery string, deps Deps, sink func(Event) error) error`**
+- 类型：内部方法；所属模块：`internal/agent`；职责：运行 agent 并分发事件
+- 入参：`stockQuery` 用户输入；`deps` 依赖注入；`sink` 回调 `func(Event) error`
 - 实现：`runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent, EnableStreaming: true})`；`iter := runner.Query(ctx, stockQuery)`；`for ev, ok := iter.Next(); ok; ev, ok = iter.Next()` 遍历 `*adk.AgentEvent`：
   - `ev.Err != nil` → 产出 `error` 事件
   - `ev.Output.MessageOutput.Role == schema.Tool` → 解析工具名：`resolve_stock` → `stock` 事件；`analyze_sentiment` → `sentiment` 事件
   - `Role == schema.Assistant` 且 `IsStreaming` → `defer mv.MessageStream.Close()`；`for { chunk, err := mv.MessageStream.Recv(); errors.Is(err, io.EOF) → break; err != nil → error 事件; else chunk.Content 为增量文本 → delta 事件 }`；非流式则整条 `delta`（已按 v0.9.14 源码核实：无 PartialOutput helper，直接用 Recv 循环）
 - 边界：ctx 取消（客户端断开）→ 立即返回；工具事件 JSON 解析失败 → 跳过该事件并记日志，不中断流
 
-#### main.go
+#### cmd/server
 
 **`func handleAsk(w http.ResponseWriter, r *http.Request)`**
 - 类型：HTTP 接口；路径：`POST /api/ask`
 - 职责：解析入参 → 建立 SSE → 调 `runAnalysis` → 事件转发
 - 入参：body `{"stock":"..."}`；`stock` 为空 → 直接 400 JSON（SSE 建立前错误不走 SSE）
-- 关键约束：SSE 响应头 `Content-Type: text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`；`http.Flusher` 断言失败 → 500；`r.Context()` 传入 `runAnalysis`（断连即取消，防 goroutine 泄漏/白烧 token）
+- 关键约束：SSE 响应头 `Content-Type: text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`；`http.Flusher` 断言失败 → 500；`r.Context()` 传入 `agent.RunAnalysis`（断连即取消，防 goroutine 泄漏/白烧 token）
 
 **`func handleResolve(w http.ResponseWriter, r *http.Request)`**
 - 类型：HTTP 接口；路径：`GET /api/resolve?q=茅台`
@@ -422,7 +440,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 ## 8. 待确认的问题
 
 - [x] **eino/eino-ext 版本锁定（已解决）**：eino v0.9.14 + deepseek 子模块 v0.1.7 + yaml.v3，API 已全部核对（见 §5 依赖锁定表）
-- [x] **ADK 流式 delta 提取（已解决）**：`MessageStream.Recv()` 循环读至 `io.EOF`，`chunk.Content` 即增量文本，`defer Close()`（见 §3.2 runAnalysis）
+- [x] **ADK 流式 delta 提取（已解决）**：`MessageStream.Recv()` 循环读至 `io.EOF`，`chunk.Content` 即增量文本，`defer Close()`（见 §3.2 internal/agent）
 - [x] **东财 suggest 接口性质（已接受风险）**：公开非官方接口无 SLA，demo 接受；生产化需换正式数据源
 - [x] **知乎 `zhihu_search` 鉴权（已解决）**：官方文档确认 `Authorization: Bearer` + `X-Request-Timestamp`（秒级 unix）+ `Content-Type: application/json`，无 HMAC；端点与参数名 `Query` 与设计一致（2026-08-16 用户提供文档）
 - [ ] **密钥配置**：`config.yaml` 中的 `zhihu.access_secret` / `deepseek.api_key` 需用户填入（影响：M0/M1 联调）——**需用户提供**

@@ -1,4 +1,5 @@
-package main
+// Package sentiment 情绪分析：知乎搜索 → LLM 批量情感分类 → 规则强度分
+package sentiment
 
 import (
 	"context"
@@ -11,21 +12,25 @@ import (
 
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino/schema"
+
+	"zhihudp/internal/config"
+	"zhihudp/internal/types"
+	"zhihudp/internal/zhihu"
 )
 
-// AnalyzeSentiment 编排：知乎搜索 → LLM 批量情感分类 → 规则强度分。
+// Analyze 编排：知乎搜索 → LLM 批量情感分类 → 规则强度分。
 // 任何环节失败都降级（Degraded=true）而非返回 error，让 agent 走降级文案。
-func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult, error) {
-	result := &SentimentResult{Code: code, Name: name, Items: []ViewItem{}}
+func Analyze(ctx context.Context, code, name string, zh *zhihu.Client, ds config.DeepSeekConfig) (*types.SentimentResult, error) {
+	result := &types.SentimentResult{Code: code, Name: name, Items: []types.ViewItem{}}
 
-	if cfg.DeepSeek.APIKey == "" {
+	if ds.APIKey == "" {
 		result.Degraded = true
 		result.ErrMsg = "未配置 deepseek.api_key，无法进行情感分类"
 		return result, nil
 	}
 
 	// 1) 知乎搜索（近 30 天讨论，取 10 条）
-	sr, err := SearchZhihu(ctx, name, 10)
+	sr, err := zh.Search(ctx, name, 10)
 	if err != nil {
 		result.Degraded = true
 		result.ErrMsg = "知乎搜索失败：" + err.Error()
@@ -38,7 +43,7 @@ func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult,
 	}
 
 	// 2) LLM 批量情感分类
-	labels, err := classifyPosts(ctx, name, sr.Data.Items)
+	labels, err := classifyPosts(ctx, name, sr.Data.Items, ds)
 	if err != nil {
 		result.Degraded = true
 		result.ErrMsg = "情感分类失败：" + err.Error()
@@ -49,14 +54,14 @@ func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult,
 	result.Heat = len(sr.Data.Items)
 	result.Sample = len(labels)
 	counts := map[string]int{}
-	items := make([]ViewItem, 0, len(sr.Data.Items))
+	items := make([]types.ViewItem, 0, len(sr.Data.Items))
 	for i, it := range sr.Data.Items {
 		label := "neutral"
 		if i < len(labels) && labels[i] != "" {
 			label = labels[i]
 		}
 		counts[label]++
-		items = append(items, ViewItem{
+		items = append(items, types.ViewItem{
 			Title:     it.Title,
 			Url:       it.Url,
 			Author:    it.AuthorName,
@@ -66,7 +71,7 @@ func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult,
 		})
 	}
 	total := float64(len(labels))
-	result.Ratio = Ratio{
+	result.Ratio = types.Ratio{
 		Bull:    round3(float64(counts["bull"]) / total),
 		Bear:    round3(float64(counts["bear"]) / total),
 		Neutral: round3(float64(counts["neutral"]) / total),
@@ -88,11 +93,11 @@ func AnalyzeSentiment(ctx context.Context, code, name string) (*SentimentResult,
 }
 
 // classifyPosts LLM 批量情感分类：一次调用分类 N 条，返回与输入对齐的标签数组
-func classifyPosts(ctx context.Context, stockName string, items []Item) ([]string, error) {
+func classifyPosts(ctx context.Context, stockName string, items []zhihu.Item, ds config.DeepSeekConfig) ([]string, error) {
 	if len(items) == 0 {
 		return []string{}, nil
 	}
-	cm, err := newDeepSeekModel(ctx)
+	cm, err := newDeepSeekModel(ctx, ds)
 	if err != nil {
 		return nil, err
 	}
@@ -147,12 +152,12 @@ sentiment 取值：bull=看多/乐观，bear=看空/悲观，neutral=中性/无�
 }
 
 // newDeepSeekModel 创建 DeepSeek ChatModel（agent 与分类共用）
-func newDeepSeekModel(ctx context.Context) (*deepseek.ChatModel, error) {
+func newDeepSeekModel(ctx context.Context, ds config.DeepSeekConfig) (*deepseek.ChatModel, error) {
 	return deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
-		APIKey:  cfg.DeepSeek.APIKey,
+		APIKey:  ds.APIKey,
 		Model:   "deepseek-chat",
-		BaseURL: cfg.DeepSeek.BaseURL,
-		Timeout: time.Duration(cfg.DeepSeek.Timeout),
+		BaseURL: ds.BaseURL,
+		Timeout: time.Duration(ds.Timeout),
 	})
 }
 
@@ -160,7 +165,7 @@ func newDeepSeekModel(ctx context.Context) (*deepseek.ChatModel, error) {
 // 公式：1 + 6*多空一致性 + log10(1+样本)/2 + 热度修正
 //   - 多空一致性（max(bull,bear)）主导：五五开≈4-5 分，强一致≈7-9 分
 //   - 样本量、热度仅作小幅修正，避免样本多但分歧大的场景虚高
-func ComputeStrength(r Ratio, sample, heat int) int {
+func ComputeStrength(r types.Ratio, sample, heat int) int {
 	dominance := math.Max(r.Bull, r.Bear)
 	s := 1 + 6*dominance + math.Log10(1+float64(sample))/2 + math.Min(float64(heat), 50)/100
 	score := int(math.Round(s))
@@ -184,4 +189,11 @@ func trimCodeFence(s string) string {
 	s = strings.TrimPrefix(s, "```")
 	s = strings.TrimSuffix(s, "```")
 	return strings.TrimSpace(s)
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

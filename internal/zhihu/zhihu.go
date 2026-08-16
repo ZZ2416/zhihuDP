@@ -1,4 +1,5 @@
-package main
+// Package zhihu 知乎开放平台客户端（Bearer + X-Request-Timestamp 鉴权）
+package zhihu
 
 import (
 	"context"
@@ -11,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"zhihudp/internal/config"
 )
 
 // SearchResponse 知乎 zhihu_search 响应（字段名以实际 JSON 为准，PascalCase）
@@ -33,9 +36,19 @@ type Item struct {
 	EditTime    int64  `json:"EditTime"`
 }
 
-// SearchZhihu 调用知乎 zhihu_search 开放接口（Bearer + X-Request-Timestamp + Content-Type）
-func SearchZhihu(ctx context.Context, query string, count int) (*SearchResponse, error) {
-	if cfg.Zhihu.AccessSecret == "" {
+// Client 知乎开放平台客户端
+type Client struct {
+	cfg config.ZhihuConfig
+}
+
+// New 创建客户端
+func New(cfg config.ZhihuConfig) *Client {
+	return &Client{cfg: cfg}
+}
+
+// Search 调用 zhihu_search 开放接口
+func (c *Client) Search(ctx context.Context, query string, count int) (*SearchResponse, error) {
+	if c.cfg.AccessSecret == "" {
 		return nil, errors.New("未配置 zhihu.access_secret（知乎 Bearer token）")
 	}
 	if count < 1 {
@@ -45,7 +58,7 @@ func SearchZhihu(ctx context.Context, query string, count int) (*SearchResponse,
 		count = 10
 	}
 
-	endpoint := zhihuSearchEndpoint()
+	endpoint := c.endpoint()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -54,7 +67,7 @@ func SearchZhihu(ctx context.Context, query string, count int) (*SearchResponse,
 	q.Set("Query", query)
 	q.Set("Count", strconv.Itoa(count))
 	req.URL.RawQuery = q.Encode()
-	req.Header.Set("Authorization", "Bearer "+cfg.Zhihu.AccessSecret)
+	req.Header.Set("Authorization", "Bearer "+c.cfg.AccessSecret)
 	req.Header.Set("X-Request-Timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -84,21 +97,28 @@ func SearchZhihu(ctx context.Context, query string, count int) (*SearchResponse,
 		return nil, fmt.Errorf("zhihu_search Code=%d Message=%s", sr.Code, sr.Message)
 	}
 
-	// 空结果返回空数组（非 nil），便于前端/降级逻辑判断
+	// 空结果返回空数组（非 nil），便于降级逻辑判断
 	if sr.Data.Items == nil {
 		sr.Data.Items = []Item{}
 	}
 	return &sr, nil
 }
 
-// zhihuSearchEndpoint 端点解析优先级：完整 URL > BaseURL + 路径 > 默认
-func zhihuSearchEndpoint() string {
-	if cfg.Zhihu.SearchURL != "" {
-		return cfg.Zhihu.SearchURL
+// endpoint 端点解析优先级：完整 URL > BaseURL + 路径 > 默认
+func (c *Client) endpoint() string {
+	if c.cfg.SearchURL != "" {
+		return c.cfg.SearchURL
 	}
-	base := strings.TrimRight(cfg.Zhihu.OpenAPIBaseURL, "/")
+	base := strings.TrimRight(c.cfg.OpenAPIBaseURL, "/")
 	if base == "" {
 		base = "https://developer.zhihu.com"
 	}
 	return base + "/api/v1/content/zhihu_search"
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

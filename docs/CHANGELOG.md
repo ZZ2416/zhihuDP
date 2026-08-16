@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-08-16 · v0.3.0 项目结构重构（标准 cmd/internal 布局）
+
+**背景**：原实现为扁平布局（9 个 .go 全在根目录），评审认为不工整；本版升级为标准 Go 项目布局，代码与文档同步。
+
+**结构变更**：
+```
+zhihuDP/
+├── cmd/server/main.go        # 入口：config.Load → buildDeps 组装 → 路由；CLI 模式(-q)
+├── internal/
+│   ├── config/               # Config / Load（yaml + env 覆盖 + 脱敏）
+│   ├── types/                # StockInfo / SentimentResult / Ratio / ViewItem / Event
+│   ├── stock/                # Resolve（东财主 + 腾讯兜底）
+│   ├── zhihu/                # Client.New + (c *Client).Search
+│   ├── sentiment/            # Analyze(ctx, code, name, zh, ds)（依赖注入）
+│   ├── agent/                # Deps + RunAnalysis(ctx, query, deps, sink)
+│   ├── compliance/           # Filter / FilterFinal
+│   └── web/                  # go:embed 内嵌前端
+└── docs/CHANGELOG.md
+```
+
+**要点**：
+- 消除全局 `cfg` 变量 → `cmd/server.buildDeps` 显式依赖注入（`zhihu.Client` → `sentiment.Analyze` 闭包 → `agent.Deps`）
+- 工具闭包直接捕获 `sink`，去掉 context 传事件的写法
+- 前端 `//go:embed` 内嵌，不依赖运行目录（`static/` 移除）
+- 单测拆分为 `internal/sentiment`、`internal/compliance` 包级测试
+
+**验证**：`go build ./...` / `go vet` / `go test` 全过；探针 200、首页 200、无密钥降级路径一致。
+**文档同步**：`tech-design.md` v1.1→v1.2（§2.1 目录/依赖/配置流向、§3.1 模块表、§3.2 方法归属）。
+
+---
+
 ## 2026-08-16 · 文档基线（前置）
 
 **交付物**：三步文档链全部完成，旧 `design.md`（问答 agent 方案）废弃。

@@ -1,4 +1,5 @@
-package main
+// Package types 共享数据结构
+package types
 
 // StockInfo 股票识别结果
 type StockInfo struct {

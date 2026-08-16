@@ -1,4 +1,5 @@
-package main
+// Package config 应用配置（配置文件模式：用户复制 config.example.yaml 后填写自定义密钥）
+package config
 
 import (
 	"fmt"
@@ -7,23 +8,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
-
-// Config 应用配置（配置文件模式：用户复制 config.example.yaml 后填写自定义密钥）
-type Config struct {
-	Zhihu struct {
-		AccessSecret   string `yaml:"access_secret"`    // 必填：知乎 Bearer token
-		OpenAPIBaseURL string `yaml:"openapi_base_url"` // 默认 https://developer.zhihu.com
-		SearchURL      string `yaml:"zhihu_search_url"` // 可选：完整 endpoint，优先级最高
-	} `yaml:"zhihu"`
-	DeepSeek struct {
-		APIKey  string   `yaml:"api_key"`  // 必填
-		BaseURL string   `yaml:"base_url"` // 默认 https://api.deepseek.com
-		Timeout Duration `yaml:"timeout"`  // 默认 120s
-	} `yaml:"deepseek"`
-	Server struct {
-		Port int `yaml:"port"` // 默认 8080
-	} `yaml:"server"`
-}
 
 // Duration 支持 "120s" 形式的 YAML 时长（yaml.v3 不自带 string→Duration 解析）
 type Duration time.Duration
@@ -41,6 +25,32 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// ZhihuConfig 知乎开放平台配置
+type ZhihuConfig struct {
+	AccessSecret   string `yaml:"access_secret"`    // 必填：知乎 Bearer token
+	OpenAPIBaseURL string `yaml:"openapi_base_url"` // 默认 https://developer.zhihu.com
+	SearchURL      string `yaml:"zhihu_search_url"` // 可选：完整 endpoint，优先级最高
+}
+
+// DeepSeekConfig DeepSeek 模型配置
+type DeepSeekConfig struct {
+	APIKey  string   `yaml:"api_key"`  // 必填
+	BaseURL string   `yaml:"base_url"` // 默认 https://api.deepseek.com
+	Timeout Duration `yaml:"timeout"`  // 默认 120s
+}
+
+// ServerConfig HTTP 服务配置
+type ServerConfig struct {
+	Port int `yaml:"port"` // 默认 8080
+}
+
+// Config 应用配置
+type Config struct {
+	Zhihu    ZhihuConfig    `yaml:"zhihu"`
+	DeepSeek DeepSeekConfig `yaml:"deepseek"`
+	Server   ServerConfig   `yaml:"server"`
+}
+
 func defaultConfig() *Config {
 	c := &Config{}
 	c.Zhihu.OpenAPIBaseURL = "https://developer.zhihu.com"
@@ -50,8 +60,8 @@ func defaultConfig() *Config {
 	return c
 }
 
-// LoadConfig 加载配置：环境变量 > config.yaml > 默认值
-func LoadConfig(path string) (*Config, error) {
+// Load 加载配置：环境变量 > config.yaml > 默认值
+func Load(path string) (*Config, error) {
 	cfg := defaultConfig()
 
 	data, err := os.ReadFile(path)

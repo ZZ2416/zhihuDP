@@ -1,8 +1,9 @@
-package main
+// Package compliance 合规措辞过滤（business-design §5 红线 + product-design §8 禁用词表）
+package compliance
 
 import "strings"
 
-// bannedWords 禁用词（business-design §5 合规红线 + product-design §8 措辞表）
+// bannedWords 禁用词
 var bannedWords = []string{
 	"买入", "卖出", "持有", "建议建仓", "建议加仓", "建议减仓", "建议买入", "建议卖出",
 	"可以上车", "赶紧买", "清仓", "满仓", "建仓", "抄底", "追高", "买进", "抛售", "减仓",

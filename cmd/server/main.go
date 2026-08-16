@@ -1,3 +1,4 @@
+// 入口：加载配置 → 组装依赖（zhihu.Client → sentiment → agent.Deps）→ HTTP 服务 / CLI 模式
 package main
 
 import (
@@ -10,33 +11,42 @@ import (
 	"net/http"
 	"strings"
 	"time"
-)
 
-// cfg 包级只读配置：main() 启动时加载，之后不再修改（并发安全）
-var cfg *Config
+	"zhihudp/internal/agent"
+	"zhihudp/internal/config"
+	"zhihudp/internal/sentiment"
+	"zhihudp/internal/stock"
+	"zhihudp/internal/types"
+	"zhihudp/internal/web"
+	"zhihudp/internal/zhihu"
+)
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "配置文件路径（默认 config.yaml）")
 	query := flag.String("q", "", "CLI 模式：运行一次分析并打印事件（如 -q 茅台）")
 	flag.Parse()
 
-	c, err := LoadConfig(*configPath)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
-	cfg = c
 	log.Printf("配置加载完成: %s", cfg.String())
 
-	// CLI 模式（M1 验证用）
+	// CLI 模式（快速验证用）
 	if *query != "" {
-		runCLI(*query)
+		runCLI(*query, cfg)
 		return
 	}
 
+	// 组装依赖（依赖注入：各包无全局状态）
+	deps := buildDeps(cfg)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/resolve", handleResolve) // 探针：股票识别（无需密钥）
-	mux.HandleFunc("POST /api/ask", handleAsk)        // SSE：完整分析
-	mux.HandleFunc("GET /", handleIndex)              // 前端入口
+	mux.HandleFunc("POST /api/ask", func(w http.ResponseWriter, r *http.Request) {
+		handleAsk(w, r, deps)
+	})
+	mux.HandleFunc("GET /", handleIndex) // 前端入口（go:embed）
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("zhihuDP 启动完成，访问 http://localhost%s", addr)
@@ -45,11 +55,24 @@ func main() {
 	}
 }
 
+// buildDeps 组装 agent 依赖
+func buildDeps(cfg *config.Config) agent.Deps {
+	zhClient := zhihu.New(cfg.Zhihu)
+	return agent.Deps{
+		ResolveStock: stock.Resolve,
+		AnalyzeSentiment: func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
+			return sentiment.Analyze(ctx, code, name, zhClient, cfg.DeepSeek)
+		},
+		DeepSeek: cfg.DeepSeek,
+	}
+}
+
 // runCLI 命令行模式：跑一次分析，打印事件
-func runCLI(query string) {
+func runCLI(query string, cfg *config.Config) {
+	deps := buildDeps(cfg)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	err := runAnalysis(ctx, query, func(ev Event) error {
+	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {
 		b, _ := json.Marshal(ev.Data)
 		fmt.Printf("[%s] %s\n", ev.Type, b)
 		return nil
@@ -60,7 +83,7 @@ func runCLI(query string) {
 }
 
 // handleAsk POST /api/ask：SSE 流式返回分析事件
-func handleAsk(w http.ResponseWriter, r *http.Request) {
+func handleAsk(w http.ResponseWriter, r *http.Request, deps agent.Deps) {
 	var req struct {
 		Stock string `json:"stock"`
 	}
@@ -83,7 +106,7 @@ func handleAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sink := func(ev Event) error {
+	sink := func(ev types.Event) error {
 		if err := writeSSE(w, ev.Type, ev.Data); err != nil {
 			return err
 		}
@@ -94,7 +117,7 @@ func handleAsk(w http.ResponseWriter, r *http.Request) {
 	// 客户端断开（r.Context()）即取消 agent 运行，防 goroutine 泄漏/白烧 token
 	ctx := r.Context()
 	start := time.Now()
-	if err := runAnalysis(ctx, req.Stock, sink); err != nil {
+	if err := agent.RunAnalysis(ctx, req.Stock, deps, sink); err != nil {
 		log.Printf("[ask] stock=%q 失败: %v", req.Stock, err)
 		_ = writeSSE(w, "error", map[string]string{"message": err.Error()})
 		flusher.Flush()
@@ -117,11 +140,11 @@ func handleResolve(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	start := time.Now()
-	info, err := ResolveStock(ctx, q)
+	info, err := stock.Resolve(ctx, q)
 	elapsed := time.Since(start).Milliseconds()
 
 	switch {
-	case errors.Is(err, ErrStockNotFound):
+	case errors.Is(err, stock.ErrNotFound):
 		log.Printf("[resolve] q=%q 未找到 耗时=%dms", q, elapsed)
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "未找到该股票，请检查名称/代码"})
 	case err != nil:
@@ -133,13 +156,19 @@ func handleResolve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleIndex GET /：托管前端
+// handleIndex GET /：托管前端（go:embed 内嵌）
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, "static/index.html")
+	data, err := web.FS.ReadFile("index.html")
+	if err != nil {
+		http.Error(w, "前端资源缺失", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(data)
 }
 
 func writeSSE(w http.ResponseWriter, event string, data any) error {
