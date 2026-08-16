@@ -20,6 +20,10 @@
 #   APP_PORT    监听端口（默认 8080，systemd + 防火墙同步）
 #   APP_USER    运行用户（默认 zhihudp，非 root）
 #   APP_DIR     安装目录（默认 /opt/zhihudp）
+#   APP_BIN     预编译二进制路径（本地交叉编译后上传，跳过装 Go/拉代码/编译）
+#   GOPROXY     Go 模块代理（默认 https://goproxy.cn,direct，加速依赖下载）
+#   GO_DL_BASE  Go 工具链下载源（默认 https://go.dev/dl；国内慢可换
+#               https://mirrors.aliyun.com/golang 或 https://golang.google.cn/dl）
 # =============================================================================
 set -euo pipefail
 
@@ -29,8 +33,16 @@ GO_VERSION="${GO_VERSION:-1.25.5}"
 APP_PORT="${APP_PORT:-8080}"
 APP_USER="${APP_USER:-zhihudp}"
 APP_DIR="${APP_DIR:-/opt/zhihudp}"
+APP_BIN="${APP_BIN:-/tmp/zhihudp.bin}"
 CONFIG_PATH="${APP_DIR}/config.yaml"
 PRIVATE_KEY="${APP_DIR}/.zhihudp/zhihudp_private.pem"
+
+# 预编译二进制已上传 → 跳过 装Go/拉代码/编译（上传慢时的最快路径）
+SKIP_BUILD=0
+if [[ -f "$APP_BIN" && "${SKIP_BUILD_FORCE:-0}" != "1" ]]; then
+  info "检测到预编译二进制 ${APP_BIN}，跳过 装Go/拉代码/编译 步骤"
+  SKIP_BUILD=1
+fi
 
 C_RED='\033[0;31m'; C_GRN='\033[0;32m'; C_YLW='\033[1;33m'; C_NC='\033[0m'
 info() { echo -e "${C_GRN}[deploy]${C_NC} $*"; }
@@ -50,6 +62,12 @@ esac
 info "系统: ${OS_ID} / ${ARCH}，端口 ${APP_PORT}，安装目录 ${APP_DIR}"
 
 # ---------- 1. 基础依赖 ----------
+if [[ "$SKIP_BUILD" == "1" ]]; then
+  if ! command -v curl >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq curl >/dev/null
+    elif command -v yum >/dev/null 2>&1; then yum install -y -q curl >/dev/null; fi
+  fi
+else
 info "安装基础依赖（git / curl / rsync）..."
 if command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
@@ -60,6 +78,7 @@ elif command -v yum >/dev/null 2>&1; then
 else
   fail "未识别的包管理器（apt/yum），请手动安装 git、curl、rsync 后重试"
 fi
+fi
 
 # ---------- 2. Go 工具链（不存在则下载官方发行版） ----------
 install_go() {
@@ -69,33 +88,43 @@ install_go() {
     info "检测到 Go $have，跳过安装（如需升级设 GO_VERSION）"
     return
   fi
-  info "下载 Go ${GO_VERSION} (linux-${GO_ARCH})..."
+  local dl_base="${GO_DL_BASE:-https://go.dev/dl}"
+  info "下载 Go ${GO_VERSION} (linux-${GO_ARCH}) ← ${dl_base} ..."
   local tarball="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
-  curl -fsSL "https://go.dev/dl/${tarball}" -o "/tmp/${tarball}" || fail "Go 下载失败（可设 GO_VERSION 换版本）"
+  curl -fsSL "${dl_base}/${tarball}" -o "/tmp/${tarball}" || fail "Go 下载失败（可设 GO_DL_BASE 换镜像，如 https://mirrors.aliyun.com/golang）"
   rm -rf "$dst"
   tar -C /usr/local -xzf "/tmp/${tarball}"
   rm -f "/tmp/${tarball}"
 }
+if [[ "$SKIP_BUILD" == "1" ]]; then
+  :
+else
 install_go
 export PATH="/usr/local/go/bin:$PATH"
 export GOTOOLCHAIN=local
+export GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"   # 国内镜像加速依赖
 go version
-
-# ---------- 3. 获取代码并编译 ----------
-BUILD_DIR="$(mktemp -d /tmp/zhihudp-build.XXXXXX)"
-trap 'rm -rf "$BUILD_DIR"' EXIT
-if [[ -d "$APP_SOURCE" ]]; then
-  info "从本地目录上传代码: $APP_SOURCE"
-  rsync -a --exclude '.git' --exclude 'config.yaml' --exclude '*.pem' "$APP_SOURCE/" "$BUILD_DIR/"
-else
-  info "克隆代码: $APP_SOURCE"
-  git clone --depth 1 -q "$APP_SOURCE" "$BUILD_DIR" \
-    || fail "git clone 失败：仓库是否公开？私有仓库请把代码 rsync 到服务器后设 APP_SOURCE=本地目录"
 fi
 
-info "编译（go:embed 内嵌前端，产物为单文件）..."
-( cd "$BUILD_DIR" && go build -trimpath -ldflags "-s -w" -o /tmp/zhihudp.bin ./cmd/server ) \
-  || fail "编译失败（Go 版本需 ≥ go.mod 要求；可设 GO_VERSION 升级）"
+# ---------- 3. 获取代码并编译 ----------
+if [[ "$SKIP_BUILD" == "1" ]]; then
+  info "使用预编译二进制: ${APP_BIN}"
+  cp "$APP_BIN" /tmp/zhihudp.bin
+else
+  BUILD_DIR="$(mktemp -d /tmp/zhihudp-build.XXXXXX)"
+  trap 'rm -rf "$BUILD_DIR"' EXIT
+  if [[ -d "$APP_SOURCE" ]]; then
+    info "从本地目录上传代码: $APP_SOURCE"
+    rsync -a --exclude '.git' --exclude 'config.yaml' --exclude '*.pem' "$APP_SOURCE/" "$BUILD_DIR/"
+  else
+    info "克隆代码: $APP_SOURCE"
+    git clone --depth 1 -q "$APP_SOURCE" "$BUILD_DIR" \
+      || fail "git clone 失败：仓库是否公开？私有仓库请把代码 rsync 到服务器后设 APP_SOURCE=本地目录"
+  fi
+  info "编译（go:embed 内嵌前端，产物为单文件）..."
+  ( cd "$BUILD_DIR" && go build -trimpath -ldflags "-s -w" -o /tmp/zhihudp.bin ./cmd/server ) \
+    || fail "编译失败（Go 版本需 ≥ go.mod 要求；可设 GO_VERSION 升级）"
+fi
 
 # ---------- 4. 运行用户与目录 ----------
 info "创建运行用户 ${APP_USER}（非 root）..."
