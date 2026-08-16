@@ -9,3 +9,7 @@ config.yaml
 
 # 构建产物
 /zhihudp
+
+# IDE 本地配置（GoLand / IntelliJ）
+.idea/
+*.iml
