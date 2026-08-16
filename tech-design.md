@@ -267,7 +267,7 @@ H --> B: HTTP 400/500 + JSON {"error": "..."}（非 SSE）
 
 **`func ComputeStrength(r Ratio, sample, heat int) int`**
 - 类型：纯函数；职责：规则计算参考强度 1-10（**非概率**，可解释可复现）
-- 规则草案：`score = clamp( round( 2.5 + 4*max(bull,bear) + 1.5*log10(1+sample) + 1*min(heat,50)/50 ), 1, 10 )`（多空一致性为主、样本量为辅、热度修正）；具体系数实现时用样例校准，设计评审确认后定稿
+- 规则（已实现定稿，2026-08-16）：`score = clamp( round( 1 + 6*max(bull,bear) + log10(1+sample)/2 + min(heat,50)/100 ), 1, 10 )`（多空一致性主导：五五开≈4-5 分、强一致≈7-9 分；样本/热度仅小幅修正，避免「样本多但分歧大」虚高；配套单测 `TestComputeStrength`）
 - 边界：`sample<5` → 调用方不调用此函数（Score=nil）
 
 #### compliance.go
