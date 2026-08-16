@@ -55,6 +55,8 @@ async function doSearch() {
   $('quote-card').classList.add('hidden');
   $('quote-body').innerHTML = '';
   $('kline-chart').innerHTML = '';
+  $('news-card').classList.add('hidden');
+  $('news-body').innerHTML = '';
   $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
   $('analysis').innerHTML = '';
   analysisText = '';
@@ -91,6 +93,7 @@ function handleEvent(event, data) {
         '<span class="market">' + esc(d.market || '') + '</span>' +
         '<span class="fresh">实时检索</span>';
       fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
+      fetchNews(d.name);            // 异步拉相关资讯（辅助，失败静默）
       break;
     case 'sentiment': renderSentiment(d); break;
     case 'delta': appendDelta(d.text || ''); break;
@@ -107,6 +110,14 @@ async function fetchKline(code, market) {
     renderQuote(data.quote);
     renderKline(data.candles || [], data.quote); // quote 用于首根涨跌幅计算
   } catch (e) { renderKlineError(); }
+}
+
+/* ---- 相关资讯（辅助，失败静默隐藏） ---- */
+async function fetchNews(name) {
+  try {
+    const items = await apiNews(name, 5);
+    if (items && items.length) renderNews(items);
+  } catch (e) { /* 静默降级 */ }
 }
 
 /* ---- 分析流式（markdown 防抖渲染） ---- */

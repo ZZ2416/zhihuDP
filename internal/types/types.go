@@ -81,3 +81,11 @@ type Kline struct {
 	Quote   Quote    `json:"quote"`
 	Candles []Candle `json:"candles"` // 升序（旧→新）；空数组表示无数据
 }
+
+// NewsItem 相关资讯（GET /api/news 返回体元素）
+type NewsItem struct {
+	Title  string `json:"title"`  // 已清洗 <em> 高亮标签
+	Url    string `json:"url"`
+	Date   string `json:"date"`   // 2026-08-14 23:18:00
+	Source string `json:"source"` // 固定 "东方财富"
+}

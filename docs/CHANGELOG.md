@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-16 · feature/news：相关资讯（辅助数据源）
+
+**背景**：评估雪球做辅助数据源——实测无免登录公开接口（WAF 反爬），改为**东财资讯搜索**（免登录实测可用），合规零风险。
+
+**需求/设计**：`features/news/SRS.md` + `features/news/SDD.md`
+
+**新增**：
+- `internal/news`（dao 层）：东财资讯搜索（JSONP 解析 + `<em>` 标签清洗）
+- `GET /api/news?keyword=&count=`（count clamp 1-10，默认 5）+ `NewsProvider` 接口
+- 前端「相关资讯」卡片（AI 分析之后）：标题链接 + 日期 + 来源；失败**静默隐藏**
+- 资讯为展示数据，**不进 LLM 上下文**（合规，与 K线同策略）
+
+**验证**：茅台 5 条真实资讯 ✅、参数校验 400 ✅、kline/resolve 回归 ✅、lint/test/JS 语法全绿 ✅
+
+---
+
 ## 2026-08-16 · K线面板交互（悬停/触摸查看当日明细）
 
 **设计**：`features/kline/INTERACTION.md`（命中检测 / 坐标换算 / 浮层规格 / 验收）

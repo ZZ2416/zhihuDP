@@ -39,13 +39,19 @@ func (fakeKlineProvider) GetKline(_ context.Context, market, code string, days i
 	}, nil
 }
 
+type fakeNewsProvider struct{}
+
+func (fakeNewsProvider) GetNews(_ context.Context, _ string, _ int) ([]types.NewsItem, error) {
+	return []types.NewsItem{{Title: "测试资讯", Url: "https://example.com", Date: "2026-08-14", Source: "东方财富"}}, nil
+}
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
 		"index.html":      {Data: []byte("<html>test</html>")},
 		"css/style.css":   {Data: []byte("body{}")},
 		"js/app.js":       {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
