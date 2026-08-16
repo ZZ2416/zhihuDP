@@ -4,7 +4,7 @@
 
 <div align="center">
 
-**知乎搜索 · AI 情绪分类 · 参考强度分 · 流式分析**
+**知乎搜索 · AI 情绪分类 · 参考强度分 · 流式分析 · 看山追问对话**
 
 [GitHub](https://github.com/ZZ2416/zhihuDP) · [联系与反馈](https://github.com/ZZ2416/zhihuDP/issues)
 
@@ -17,11 +17,23 @@
 - 🔍 **股票识别**：输入名称或代码（`茅台` / `600519`），东财主选 + 腾讯兜底
 - 📊 **情绪面板**：讨论热度、多空占比（看多/看空/中性）、参考强度分（1-10）、代表观点（带原帖链接）
 - 🤖 **AI 分析**：基于真实知乎讨论流式生成三段解读（情绪面总结 / 值得关注的讨论点 / 风险提示）
+- 🦊 **与看山对话（二期）**：分析完成后可就结果**多轮追问**——「AI 看山」人设（刘看山）结合行情快照、情绪面板、知识库与前次分析回答，只给方法/维度/风险提示，不荐股
+- 📈 **热门板块 / 📉 暴跌板块 / 热门股票**：侧边栏实时榜单，涨幅**四档分级配色**（跌绿 / 0~2% 黄 / 2~4% 橙 / ≥4% 红），点击直达查询
+- 📚 **讨论文章**：知乎知识库方形卡片，链接可用性校验（失效不展示）
+- 🔑 **密钥配置弹窗**：开屏动画 + 首次进入可配置自己的 DeepSeek / 知乎密钥（可跳过用默认）；用户密钥 **RSA 公私钥加密**传输，默认密钥绝不下发明文
 - ⚡ **SSE 流式输出**：分析面板逐字呈现
 - 🌙 **明暗主题**：手动切换 + 跟随系统偏好
-- 🐋 **知乎看山风格**：知乎蓝设计系统 + 鲸鱼元素
 - 🛡️ **合规设计**：不输出买卖结论 / 不用「概率」措辞 / 输出禁用词过滤 / 全程免责声明
 - 📝 **友好降级**：股票不存在 / 数据不足 / 搜索失败时优雅提示，不报技术错误
+
+## 版本变更
+
+| 版本 | 里程碑 | 说明 |
+|---|---|---|
+| **v2.0** | 与看山对话 | 二期：多轮追问对话（AI 看山 Agent，按股票隔离会话）、行情快照/知识库/前次分析注入上下文、合规过滤强化 |
+| v1.x | 一期核心 | 个股识别 → 行情/K线 → 情绪面板 → AI 分析；热门榜单、讨论文章、密钥弹窗（RSA 加密）、看山主题 |
+
+> 完整逐条变更见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
 ## 技术栈
 
@@ -83,6 +95,17 @@ curl -N -X POST http://localhost:8080/api/ask \
 
 事件协议：`stock`（股票识别）→ `sentiment`（情绪面板 JSON）→ `delta`×N（流式分析）→ `done` / `error`
 
+### POST /api/chat（二期 · 看山追问对话，SSE 流式）
+
+```bash
+curl -N -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"stock":"600519","market":"沪A","message":"情绪为什么偏空？"}'
+```
+
+- 会话按股票代码隔离（多轮上下文）；`POST /api/chat/reset` 清空会话
+- 事件协议同 `/api/ask`（`delta` → `done` / `error`）
+
 ### GET /api/resolve?q=（探针）
 
 ```bash
@@ -90,21 +113,37 @@ curl "http://localhost:8080/api/resolve?q=600519"
 # {"code":"600519","name":"贵州茅台","market":"沪A"}
 ```
 
+### 其他接口
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/kline?code=&market=&days=` | 行情：报价 + 日K线 |
+| `GET /api/hot?type=stock\|sector\|sector_fall\|sector_stock` | 热门股票 / 上升板块 / 暴跌板块 / 板块成分股 |
+| `GET /api/news?keyword=&count=` | 相关资讯（辅助展示） |
+| `GET /api/knowledge?q=&limit=` | 知识库搜索（讨论文章卡片，失效链接已过滤） |
+| `GET /api/config/pubkey` | 下发 RSA 公钥（密钥弹窗加密用） |
+| `POST /api/config/keys` | 提交加密后的用户密钥（RSA-OAEP，私钥仅服务端） |
+
 ## 项目结构（标准 cmd/internal + Router/Handler/Service/Data 四层）
 
 ```
 zhihuDP/
 ├── cmd/server/            # 入口：配置加载 → 依赖组装 → 启动（含 CLI 模式）
 ├── internal/
-│   ├── server/            # HTTP 层：Router + Handler（依赖 Analyzer/Resolver 接口）
-│   ├── agent/             # controller 层：eino ADK ReAct 编排 + 事件分发
+│   ├── server/            # HTTP 层：Router + Handler（依赖 Analyzer/ChatProvider 等接口）
+│   ├── agent/             # controller 层：eino ADK ReAct 编排 + 看山对话（chat.go）
+│   ├── chat/              # service 层（二期）：会话存储（按股票隔离）+ 上下文事实组装
 │   ├── sentiment/         # service 层：情绪分析（LLM 分类 + 规则强度分）
-│   ├── zhihu/             # dao 层：知乎搜索客户端（Bearer 鉴权）
+│   ├── zhihu/             # dao 层：知乎搜索 + 知识库 RAG 客户端（Bearer 鉴权）
 │   ├── stock/             # dao 层：股票识别（东财 + 腾讯）
+│   ├── kline/             # dao 层：行情 K线（腾讯，除权处理）
+│   ├── hot/               # dao 层：热门股票 / 板块榜（腾讯，涨幅/跌幅本地排序）
+│   ├── news/              # dao 层：相关资讯（东财，仅展示）
+│   ├── keybox/            # 密钥箱：RSA 公私钥（弹窗密钥加密传输）
 │   ├── compliance/        # 合规禁用词过滤
 │   ├── config/            # 配置文件加载（YAML + env 覆盖 + 脱敏）
 │   ├── types/             # 共享结构 + 哨兵错误
-│   └── web/               # 前端（独立分层：index.html + css/ + js/ 八模块）
+│   └── web/               # 前端（独立分层：index.html + css/ + js/ 模块）
 └── docs/CHANGELOG.md      # 变更记录
 ```
 
@@ -115,12 +154,16 @@ zhihuDP/
 | [business-design.md](business-design.md) | 业务定位、规则语义、合规红线、8 项验收标准 |
 | [product-design.md](product-design.md) | 产品设计稿（线框、交互、文案规范） |
 | [tech-design.md](tech-design.md) | 技术设计（架构、时序、依赖锁定、API 协议） |
+| [features/v2/SRS.md](features/v2/SRS.md) | 二期需求规格（看山对话，v0.2 定稿） |
+| [features/v2/SDD.md](features/v2/SDD.md) | 二期技术设计（会话/快照/人设/合规） |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 变更记录 |
 
 ## 路线图
 
-- [ ] 阶段 2：行情数据接入（知乎接口）、情绪分类正式评测基准、真实用户试用
-- [ ] 阶段 3：合规审查、变现模式、日频快照
+- [x] **阶段 1（一期）**：个股识别 → 行情/K线 → 情绪面板 → AI 分析（流式）
+- [x] **阶段 2（二期）**：与看山对话（多轮追问 Agent）、热门/暴跌板块、讨论文章、密钥安全
+- [ ] 阶段 3：情绪分类正式评测基准、历史会话回看、真实用户试用
+- [ ] 阶段 4：合规审查、变现模式、日频快照
 
 ## 免责声明
 
