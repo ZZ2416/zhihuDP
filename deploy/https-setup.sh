@@ -54,8 +54,7 @@ chmod 600 /etc/nginx/ssl/zhihudp-key.pem
 info "写入 nginx 站点配置（https://:${HTTPS_PORT} → 127.0.0.1:${APP_PORT}）..."
 cat > /etc/nginx/sites-available/zhihudp-https <<EOF
 server {
-    listen ${HTTPS_PORT} ssl;
-    http2 on;
+    listen ${HTTPS_PORT} ssl http2;   # http2 需写在 listen 参数（兼容 nginx 1.18+）
     server_name _;
 
     ssl_certificate     /etc/nginx/ssl/zhihudp-cert.pem;
