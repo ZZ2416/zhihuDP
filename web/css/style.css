@@ -519,30 +519,6 @@ footer p { margin: 3px 0; }
 .fd-val { width: 34px; text-align: right; font-weight: 700; flex: none; }
 .fd-val-line { margin-top: 10px; font-size: 12px; color: var(--sub); }
 .fd-nodata { margin-top: 8px; font-size: 11.5px; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 6px 10px; }
-.wl-add-btn { margin-left: auto; font-size: 12px; color: var(--accent); background: var(--accent-weak); border: 1px solid var(--accent); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
-.wl-add-btn:hover { background: var(--accent); color: #fff; }
-
-/* ===== 自选池 ===== */
-.watchlist-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
-.watchlist-add-row input {
-  flex: 1; padding: 8px 12px; font-size: 13px; border: 1.5px solid var(--border);
-  border-radius: 8px; outline: none; background: var(--card); color: var(--text);
-}
-.watchlist-add-row input:focus { border-color: var(--accent); }
-.watchlist-add-row button {
-  padding: 0 18px; font-size: 13px; font-weight: 600; background: var(--accent); color: #fff;
-  border: none; border-radius: 8px; cursor: pointer;
-}
-.watchlist-list { display: flex; flex-direction: column; }
-.wl-item { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-top: 1px solid var(--border); cursor: default; }
-.wl-item:first-child { border-top: none; }
-.wl-item.clickable { cursor: pointer; }
-.wl-item.clickable:hover { background: var(--card-soft); border-radius: 6px; }
-.wl-name { font-size: 13px; font-weight: 600; width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wl-score { font-size: 14px; font-weight: 800; margin-left: auto; }
-.wl-score em { font-style: normal; font-size: 11px; font-weight: 500; opacity: .75; margin-left: 4px; }
-.wl-rm { color: var(--faint); font-size: 15px; padding: 0 4px; cursor: pointer; }
-.wl-rm:hover { color: var(--err-text); }
 
 /* ===== 基本面解读排版（AI 解读区） ===== */
 #fundamental-analysis {

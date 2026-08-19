@@ -34,12 +34,6 @@ async function apiHot(type, count, code) {
   return resp.json();
 }
 
-async function apiKnowledge(q, limit) {
-  const resp = await fetch('/api/knowledge?q=' + encodeURIComponent(q) + '&limit=' + (limit || 10));
-  if (!resp.ok) return null;
-  return resp.json();
-}
-
 /* 二期：与看山对话 */
 async function apiChat(code, market, message) {
   return fetch('/api/chat', {

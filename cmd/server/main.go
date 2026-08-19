@@ -90,6 +90,7 @@ func main() {
 		Finance: func(ctx context.Context, code, market string) (*types.FinanceResult, error) {
 			return finance.GetResult(ctx, code, market)
 		},
+		Fundamental: fundSvc.Score,
 		ChatAgent: func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error {
 			return agent.Chat(ctx, facts, history, message, deps, sink)
 		},

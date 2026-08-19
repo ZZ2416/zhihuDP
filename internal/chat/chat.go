@@ -120,6 +120,8 @@ type Deps struct {
 	Quote func(ctx context.Context, market, code string) (*types.Quote, error)
 	// Finance 财报指标（5年年报+最新期）；由 finance.GetResult 包装，可为 nil（跳过）
 	Finance func(ctx context.Context, code, market string) (*types.FinanceResult, error)
+	// Fundamental 基本面评分（四维+估值）；由 fundamental.Service.Score 包装，可为 nil（跳过）
+	Fundamental func(ctx context.Context, code, market string) (*types.FundamentalResult, error)
 	// ChatAgent 调用「AI 看山」对话（internal/agent.Chat 包装），SSE 事件经 sink 转发
 	ChatAgent func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error
 }
@@ -199,7 +201,33 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 			facts.Finance = formatFinance(res.Indicators)
 		}
 	}
+	// 基本面评分与估值（四维 + PE/PB/分位）
+	if s.deps.Fundamental != nil && facts.StockCode != "" {
+		if res, err := s.deps.Fundamental(ctx, facts.StockCode, facts.Market); err == nil && res != nil {
+			facts.Score = formatScore(res.Score)
+			facts.Valuation = formatValuation(res.Valuation)
+		}
+	}
 	return facts, nil
+}
+
+// formatScore 四维评分 → 紧凑文本
+func formatScore(sc types.FundamentalScore) string {
+	return fmt.Sprintf("总分 %d（%s）：盈利 %d，成长 %d，财务健康 %d，估值 %d",
+		sc.Total, sc.Grade, sc.Profit, sc.Growth, sc.Health, sc.Valuat)
+}
+
+// formatValuation 估值 → 紧凑文本
+func formatValuation(v types.Valuation) string {
+	pe := "—"
+	if v.PE > 0 {
+		pe = fmt.Sprintf("%.2f", v.PE)
+	}
+	pct := "无分位"
+	if v.PEEntPercent >= 0 {
+		pct = fmt.Sprintf("%.0f%%", v.PEEntPercent)
+	}
+	return fmt.Sprintf("PE(TTM) %s（历史分位 %s），PB %.2f", pe, pct, v.PB)
 }
 
 // formatFinance 财务指标 → 紧凑文本（报告期 | 营收 | 净利 | ROE | 毛利率 | 负债率）

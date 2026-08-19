@@ -315,3 +315,26 @@ func TestMediaTokenProtection(t *testing.T) {
 		t.Fatalf("路径穿越应 404，实际 %d", rec.Code)
 	}
 }
+
+func TestFundamentalHandler(t *testing.T) {
+	s := newTestServer()
+	// 正常：6 位代码
+	req := httptest.NewRequest(http.MethodGet, "/api/fundamental?code=600519&market=沪A", nil)
+	rec := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("期望 200，实际 %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "质地良好") {
+		t.Errorf("响应应含评分: %s", rec.Body.String())
+	}
+	// 非法 code（7 位 / 非数字）→ 400
+	for _, bad := range []string{"0000010", "abc", "60051"} {
+		req = httptest.NewRequest(http.MethodGet, "/api/fundamental?code="+bad, nil)
+		rec = httptest.NewRecorder()
+		s.Routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("code=%s 期望 400，实际 %d", bad, rec.Code)
+		}
+	}
+}
