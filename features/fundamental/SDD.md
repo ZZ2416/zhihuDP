@@ -1,6 +1,7 @@
 # 基本面分析（替换知乎情绪，定位 v2）— 软件设计文档（SDD）
 
-> 版本：v0.1 · 日期：2026-08-19 · 分支：`feature/fundamental`
+> 版本：v0.2（决策定稿）· 日期：2026-08-19 · 分支：`feature/fundamental`
+> 决策补充：① AI 解读**合并进 ask**（去掉独立 /api/fundamental/analyze）② 人设改为中性助手 + **「黑德文」**黑色系标识（非拟人）③ 估值分位用 **PE(TTM) 分位**（PB 仅展示）
 > 依据：`business-design.md`（定位 v2）、`features/fundamental/设计方案.md`（v0.2）
 > 本期范围：删知乎 → 四维评分（各自卡片）→ 估值历史分位 → 自选池 20 只；**产业链不做**
 
@@ -75,10 +76,6 @@ type WatchItem struct {
 - 返回 `FundamentalResult`（指标 + 估值 + 四维评分）；展示数据，不计配额
 - 失败 502（财务或估值全挂）
 
-### POST /api/fundamental/analyze（SSE）
-- body `{code, market}`；AI 基本面解读（五段：综合质地/盈利/成长/健康/估值风险）
-- **计配额**（与 ask/chat 共享）
-
 ### 自选池
 | 接口 | 说明 |
 |---|---|
@@ -88,8 +85,9 @@ type WatchItem struct {
 
 - 持久化：`watchlist.json`（config `server.data_dir`，默认 ./data/），本地文件，重启保留
 
-### /api/ask 改造
-- 事件协议：`stock` → **`fundamental`**（评分 JSON，替代原 sentiment）→ `delta`×N（AI 基本面解读）→ `done`
+### /api/ask 改造（唯一 AI 解读入口）
+- 事件协议：`stock` → **`fundamental`**（评分 JSON，替代原 sentiment）→ `delta`×N（**AI 基本面解读**，注入评分+财报+估值）→ `done`
+- **去掉独立 /api/fundamental/analyze**（避免两次 LLM 重复分析）；delta 计配额（ask 原机制）
 - 移除 `sentiment` 事件与情绪相关工具/依赖
 
 ## 5. 四维评分模型（打分函数，规则可复现）
@@ -143,8 +141,9 @@ server -> watchlistStore: 追加 + 写文件
 
 ### 7.3 agent 改造（ask 基本面解读）
 - 删除 sentiment 工具与情绪注入
-- Instruction 改为基本面解读：注入 评分（四维+总分+定性）+ 财务指标表 + 估值（PE/PB/分位）
+- Instruction 改为**中性专业**基本面解读（标识「黑德文」仅界面层，回答不拟人）：注入 评分（四维+总分+定性）+ 财务指标表 + 估值（PE/PB/分位）
 - 输出五段（综合质地/盈利/成长/健康/估值风险），合规过滤不变
+- 人设：去「AI 看山」口吻 → 中性分析助手；前端黑色系「黑德文」标识
 
 ### 7.4 chat 上下文改造
 - `ChatFacts`：删 `Sentiment`/`Knowledge`；加 `Valuation`（估值+分位）与 `Score`（四维评分）
