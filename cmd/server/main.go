@@ -324,7 +324,6 @@ func runCLI(query string, cfg *config.Config) {
 	})
 	deps := buildDeps(cfg)
 	deps.FundamentalScore = fundSvc.Score
-	deps.FundamentalScore = fundSvc.Score
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {

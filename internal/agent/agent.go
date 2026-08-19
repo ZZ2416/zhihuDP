@@ -130,7 +130,9 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		}) (string, error) {
 			result, err := deps.FundamentalScore(ctx, req.Code, req.Market)
 			if err != nil {
-				return "", err
+				// 降级：返回 JSON 错误信息，LLM 如实说明「财务数据不可用」，避免前端裸错误
+				b, _ := json.Marshal(map[string]string{"error": err.Error()})
+				return string(b), nil
 			}
 			_ = sink(types.Event{Type: "fundamental", Data: result})
 			b, _ := json.Marshal(result)
