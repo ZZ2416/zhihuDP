@@ -1,6 +1,6 @@
 # 基本面分析（替换知乎情绪，定位 v2）— 软件设计文档（SDD）
 
-> 版本：v0.3（决策定稿）· 日期：2026-08-19 · 分支：`feature/fundamental`
+> 版本：v0.4（已实现，含实现差异）· 日期：2026-08-19 · 分支：`feature/fundamental`
 > 决策补充 v0.3：⑤ `/api/finance/analyze` **保留并存**（财务解析表格+AI 与 ask 基本面解读共存）⑥ **PE 统一东财 PE_TTM**（当前值与分位同源；腾讯仅兜底/展示 PB 市值）⑦ 原「AI 分析」卡**合并进基本面卡** ⑧ 自选池**两种添加**（详情页按钮 + 卡片内输入）
 > 决策补充：① AI 解读**合并进 ask**（去掉独立 /api/fundamental/analyze）② 人设改为中性助手 + **「黑德文」**黑色系标识（非拟人）③ 估值分位用 **PE(TTM) 分位**（PB 仅展示）
 > 依据：`business-design.md`（定位 v2）、`features/fundamental/设计方案.md`（v0.2）
@@ -196,6 +196,15 @@ server -> watchlistStore: 追加 + 写文件
 | internal/sentiment/、internal/zhihu/ | 删除 |
 | features/fundamental/SRS.md | 新增 |
 | docs/CHANGELOG.md | 改 |
+
+## 9.5 实现差异记录（v0.4，与设计不同处）
+- **自选池已移除**（用户决定不做）：internal/watchlist、/api/watchlist、WatchItem 全部删除
+- **GET /api/fundamental 已实现**：FundamentalProvider + handler（code 6 位校验 400）
+- **AI 解读排版**：#fundamental-analysis 专属排版（标题层级/色条/行高）
+- **估值分位落地**：东财 RPT_VALUEANALYSIS_DET 419 日 PE_TTM 序列（当前 PE 与分位同源）；亏损公司 PE≤0 → 分位 -1
+- **评分修正**（CR）：CAGR 按报告期年份差、ROE 趋势只比年报（中报不参与）、数据不足维度归一
+- **chat 上下文**：行情 + 财报 + 估值 + 四维评分 + 前次分析（去知乎）
+- **黑德文标识弃用**：恢复刘看山图（logo/开屏/mascot/对话头像）；「与看山对话」名保留
 
 ## 10. 验证方案
 

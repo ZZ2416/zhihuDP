@@ -2,18 +2,11 @@
 # 使用：复制本文件为 config.yaml 使用
 #
 # 密钥两种方式（任选其一）：
-#   A. 明文：直接填 api_key / access_secret（本地自用）
+#   A. 明文：直接填 api_key（本地自用）
 #   B. 密文（推荐，可安全入库）：先运行 `go run ./cmd/server -keygen` 生成密钥对并加密，
 #      再把输出的 *_enc 粘贴到下面。私钥在 ~/.zhihudp/zhihudp_private.pem（600 权限，勿入库）。
 keybox:
   private_key: ""                     # 可选：私钥文件路径；留空用默认 ~/.zhihudp/zhihudp_private.pem
-
-zhihu:
-  access_secret: ""                   # 方式A：明文知乎 Access Secret（developer.zhihu.com/profile 获取）
-  access_secret_enc: ""               # 方式B：RSA 公钥加密后的密文（存在时优先，解密使用）
-  openapi_base_url: "https://developer.zhihu.com"
-  zhihu_search_url: ""                # 可选：完整 endpoint，优先级最高；留空用默认
-  knowledge_base_id: "7520243014858214186"  # 可选：知识库搜索用（股票投资方法论库）
 
 deepseek:
   api_key: ""                         # 方式A：明文 DeepSeek API Key
@@ -25,5 +18,5 @@ server:
   port: 8080                          # 访问 http://localhost:8080
 
 media:
-  dir: ""                          # 演示视频目录；经 /media/player 播放（抖音式禁止转载）
-  token: ""                        # 播放令牌：发给想看的人，无/错 token 一律 403
+  dir: ""                             # 演示视频目录；经 /media/player 播放（抖音式禁止转载）
+  token: ""                           # 播放令牌：发给想看的人，无/错 token 一律 403
