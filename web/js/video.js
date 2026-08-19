@@ -45,7 +45,7 @@ function renderVideos() {
   for (const v of items) {
     html += '<a class="video-card" href="' + esc(v.url) + '" target="_blank" rel="noopener" title="' + esc(v.title) + '">' +
       '<div class="vc-pic">' +
-        (v.pic ? '<img src="' + esc(v.pic) + '" loading="lazy" alt="封面">' : '<span class="vc-noimg">无封面</span>') +
+        (v.pic ? '<img src="' + esc(v.pic) + '" loading="lazy" alt="封面" referrerpolicy="no-referrer">' : '<span class="vc-noimg">无封面</span>') +
         '<span class="vc-dur">' + esc(v.duration) + '</span>' +
       '</div>' +
       '<div class="vc-title">' + esc(v.title) + '</div>' +
