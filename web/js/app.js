@@ -108,7 +108,7 @@ function handleEvent(event, data) {
       fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
       fetchNews(d.name);            // 异步拉相关资讯（辅助，失败静默）
       loadFinance(d.code, d.market); // 财报解析：指标 + AI 解析（东财双源）
-      loadVideo(d.name);             // 相关视频（B站，按时间/播放量）
+
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
     case 'sentiment': renderSentiment(d); break;

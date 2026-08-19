@@ -171,6 +171,7 @@ type MinuteResult struct {
 type VideoItem struct {
 	Title       string `json:"title"` // 已清洗高亮标签
 	Url         string `json:"url"`   // https://www.bilibili.com/video/BVxxx
+	Pic         string `json:"pic"`   // 封面图 URL（https://）
 	Bvid        string `json:"bvid"`
 	Play        int64  `json:"play"`         // 播放量
 	Danmaku     int64  `json:"danmaku"`      // 弹幕数

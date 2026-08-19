@@ -72,6 +72,7 @@ func GetVideos(ctx context.Context, keyword string, count int) ([]types.VideoIte
 			Result []struct {
 				Title        string `json:"title"`
 				Bvid         string `json:"bvid"`
+				Pic          string `json:"pic"`
 				Play         int64  `json:"play"`
 				VideoReview  int64  `json:"video_review"`
 				Duration     string `json:"duration"` // 秒（字符串）
@@ -98,6 +99,7 @@ func GetVideos(ctx context.Context, keyword string, count int) ([]types.VideoIte
 		items = append(items, types.VideoItem{
 			Title:       cleanTitle(v.Title),
 			Url:         "https://www.bilibili.com/video/" + v.Bvid,
+			Pic:         absURL(v.Pic),
 			Bvid:        v.Bvid,
 			Play:        v.Play,
 			Danmaku:     v.VideoReview,
@@ -205,6 +207,14 @@ func sortStrings(s []string) {
 // ---- 工具 ----
 
 var emTag = regexp.MustCompile(`<[^>]+>`)
+
+// absURL 补全封面 URL（//i0.hdslb.com/... → https://i0.hdslb.com/...）
+func absURL(u string) string {
+	if strings.HasPrefix(u, "//") {
+		return "https:" + u
+	}
+	return u
+}
 
 // cleanTitle 去除 <em class="keyword"> 等高亮标签
 func cleanTitle(s string) string {

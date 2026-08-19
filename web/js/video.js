@@ -33,21 +33,24 @@ function sortVideos(mode) {
   renderVideos();
 }
 
-/* 渲染：时间（新→旧）或播放量（大→小） */
+/* 渲染：卡片网格（封面 + 标题 + 播放量/时长），时间（新→旧）或播放量（大→小） */
 function renderVideos() {
-  const items = [...videoItems];
+  const items = [...videoItems].slice(0, 5); // 卡片只展示 5 条
   if (videoSort === 'time') {
     items.sort((a, b) => (b.publish_time || '').localeCompare(a.publish_time || ''));
   } else {
     items.sort((a, b) => (b.play || 0) - (a.play || 0));
   }
-  let html = '<div class="video-list">';
+  let html = '<div class="video-grid">';
   for (const v of items) {
-    html += '<div class="video-item">' +
-      '<a class="t" href="' + esc(v.url) + '" target="_blank" rel="noopener" title="打开视频">' + esc(v.title) + '</a>' +
-      '<span class="meta">▶ ' + fmtPlay(v.play) + ' · ' + esc(v.duration) + ' · ' + esc(v.author || '') + '</span>' +
-      '<span class="date">' + esc((v.publish_time || '').slice(0, 16)) + '</span>' +
-      '</div>';
+    html += '<a class="video-card" href="' + esc(v.url) + '" target="_blank" rel="noopener" title="' + esc(v.title) + '">' +
+      '<div class="vc-pic">' +
+        (v.pic ? '<img src="' + esc(v.pic) + '" loading="lazy" alt="封面">' : '<span class="vc-noimg">无封面</span>') +
+        '<span class="vc-dur">' + esc(v.duration) + '</span>' +
+      '</div>' +
+      '<div class="vc-title">' + esc(v.title) + '</div>' +
+      '<div class="vc-meta">▶ ' + fmtPlay(v.play) + ' · ' + esc(v.author || '') + '</div>' +
+      '</a>';
   }
   html += '</div>';
   $('video-body').innerHTML = html;
