@@ -78,8 +78,10 @@ function renderNews(items) {
   if (!items || !items.length) return; // 无资讯不显示卡片
   let html = '<div class="news-list">';
   for (const it of items) {
+    const u = it.url || '';
     html += '<div class="news-item">' +
-      '<span class="t" title="外部资讯仅供参考，不提供跳转">' + esc(it.title || '(无标题)') + '</span>' +
+      (u ? '<a class="t" href="' + esc(u) + '" target="_blank" rel="noopener" title="打开原文">' + esc(it.title || '(无标题)') + '</a>'
+          : '<span class="t">' + esc(it.title || '(无标题)') + '</span>') +
       '<span class="date">' + esc((it.date || '').slice(0, 10)) + '</span>' +
       '<span class="src">' + esc(it.source || '') + '</span>' +
       '</div>';

@@ -55,3 +55,15 @@ async function apiChatReset(code) {
   });
   return resp.ok;
 }
+
+/* 财报解析 */
+async function apiFinance(code, market) {
+  return fetch('/api/finance?code=' + encodeURIComponent(code) + '&market=' + encodeURIComponent(market || ''));
+}
+
+async function apiFinanceAnalyze(code, market) {
+  return fetch('/api/finance/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, market: market || '' })
+  });
+}

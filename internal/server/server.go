@@ -100,6 +100,14 @@ type KeyService interface {
 	PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error
 }
 
+// FinanceProvider 财务解析服务接口（由入口 financeProvider 实现）
+type FinanceProvider interface {
+	// GetFinance 获取股票财务指标（5 年年报 + 最新报告期）
+	GetFinance(ctx context.Context, code, market string) (*types.FinanceResult, error)
+	// AnalyzeFinance 财报 AI 解析（SSE 事件经 sink 转发）
+	AnalyzeFinance(ctx context.Context, code, market string, sink func(types.Event) error) error
+}
+
 // ChatProvider 二期追问对话服务接口（由 internal/chat.Service 实现）
 type ChatProvider interface {
 	// Chat 处理一次追问：SSE 事件经 sink 转发（delta → done）
@@ -120,6 +128,7 @@ type Server struct {
 	knowledge     KnowledgeProvider
 	keyService    KeyService
 	chatProvider  ChatProvider
+	finance       FinanceProvider
 	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
 	mediaDir      string      // 媒体目录（/media/ 播放）；空 = 禁用
 	mediaToken    string      // 媒体访问令牌；空/不匹配 → 403（防未授权访问与转发）
@@ -127,7 +136,7 @@ type Server struct {
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -137,6 +146,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		knowledge:     knowledge,
 		keyService:    keyService,
 		chatProvider:  chatProvider,
+		finance:       finance,
 		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		mediaDir:      mediaDir,
 		mediaToken:    mediaToken,
@@ -147,16 +157,18 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 // Routes 注册路由（Router 层）
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/resolve", s.handleResolve)         // 探针：股票识别（无需密钥）
-	mux.HandleFunc("GET /api/kline", s.handleKline)             // 行情：报价 + 日K线
-	mux.HandleFunc("GET /api/news", s.handleNews)               // 资讯：相关新闻（辅助）
-	mux.HandleFunc("GET /api/hot", s.handleHot)                 // 热门：股票/板块榜
-	mux.HandleFunc("GET /api/knowledge", s.handleKnowledge)     // 知识库搜索：股票讨论
-	mux.HandleFunc("GET /api/config/pubkey", s.handlePubKey)    // 密钥箱：下发 RSA 公钥
-	mux.HandleFunc("POST /api/config/keys", s.handleUpdateKeys) // 密钥箱：接收加密提交的用户密钥
-	mux.HandleFunc("POST /api/ask", s.handleAsk)                // SSE：完整分析
-	mux.HandleFunc("POST /api/chat", s.handleChat)              // SSE：二期看山追问对话
-	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)   // 二期：清空某股票会话
+	mux.HandleFunc("GET /api/resolve", s.handleResolve)                 // 探针：股票识别（无需密钥）
+	mux.HandleFunc("GET /api/kline", s.handleKline)                     // 行情：报价 + 日K线
+	mux.HandleFunc("GET /api/news", s.handleNews)                       // 资讯：相关新闻（辅助）
+	mux.HandleFunc("GET /api/hot", s.handleHot)                         // 热门：股票/板块榜
+	mux.HandleFunc("GET /api/knowledge", s.handleKnowledge)             // 知识库搜索：股票讨论
+	mux.HandleFunc("GET /api/config/pubkey", s.handlePubKey)            // 密钥箱：下发 RSA 公钥
+	mux.HandleFunc("POST /api/config/keys", s.handleUpdateKeys)         // 密钥箱：接收加密提交的用户密钥
+	mux.HandleFunc("POST /api/ask", s.handleAsk)                        // SSE：完整分析
+	mux.HandleFunc("POST /api/chat", s.handleChat)                      // SSE：二期看山追问对话
+	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)           // 二期：清空某股票会话
+	mux.HandleFunc("GET /api/finance", s.handleFinance)                 // 财务指标（展示数据）
+	mux.HandleFunc("POST /api/finance/analyze", s.handleFinanceAnalyze) // 财报 AI 解析（SSE，计配额）
 	// 媒体播放（抖音式禁止转载）：token 校验 + 受保护播放页 + 视频流（Range 支持）
 	if s.mediaDir != "" && s.mediaToken != "" {
 		mux.HandleFunc("GET /media/player", s.handleMediaPlayer) // 播放页（禁下载/右键）

@@ -96,6 +96,9 @@ func formatFacts(f types.ChatFacts) string {
 	if f.Sentiment != "" {
 		b.WriteString("知乎情绪：" + f.Sentiment + "\n")
 	}
+	if f.Finance != "" {
+		b.WriteString("财务指标：\n" + f.Finance)
+	}
 	if f.Knowledge != "" {
 		b.WriteString("知识库片段：\n" + f.Knowledge)
 	}

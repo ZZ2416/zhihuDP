@@ -87,6 +87,14 @@
       </div>
     </div>
 
+    <!-- 财报解析：核心指标表格 + AI 解析（东财双源）——位于情绪面板上方 -->
+    <div class="card hidden" id="finance-card">
+      <div class="section-title">财务解析 <span class="fin-source">东方财富 · 最近5年年报</span></div>
+      <div id="finance-table"></div>
+      <div id="finance-analysis"><span class="fin-loading">正在解析财报…</span></div>
+      <div class="fin-foot">数据来源：东方财富 · 财报解读仅供参考，不构成投资建议</div>
+    </div>
+
     <div class="card">
       <div class="section-title">情绪面板</div>
       <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
@@ -179,6 +187,7 @@
 <script src="/js/ui.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/chat.js"></script>
+<script src="/js/finance.js"></script>
 <script src="/js/keys.js"></script>
 </body>
 </html>

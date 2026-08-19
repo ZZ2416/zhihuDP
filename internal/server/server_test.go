@@ -72,13 +72,26 @@ func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ *types.Sentim
 
 func (fakeChatProvider) Reset(_ string) {}
 
+// fakeFinanceProvider 财报桩
+type fakeFinanceProvider struct{}
+
+func (fakeFinanceProvider) GetFinance(_ context.Context, code, _ string) (*types.FinanceResult, error) {
+	return &types.FinanceResult{Code: code, Name: "测试股", Indicators: []types.FinancialIndicator{
+		{ReportDate: "2025年报", Revenue: 100, NetProfit: 10},
+	}}, nil
+}
+
+func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink func(types.Event) error) error {
+	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
+}
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
 		"index.html":    {Data: []byte("<html>test</html>")},
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
