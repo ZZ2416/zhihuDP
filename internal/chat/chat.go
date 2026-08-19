@@ -121,6 +121,8 @@ type Deps struct {
 	Quote func(ctx context.Context, market, code string) (*types.Quote, error)
 	// Knowledge 知识库检索片段：由 zhClient.KnowledgeSearch 包装（默认股票讨论 KB）
 	Knowledge func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error)
+	// Finance 财报指标（5年年报+最新期）；由 finance.GetResult 包装，可为 nil（跳过）
+	Finance func(ctx context.Context, code, market string) (*types.FinanceResult, error)
 	// ChatAgent 调用「AI 看山」对话（internal/agent.Chat 包装），SSE 事件经 sink 转发
 	ChatAgent func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error
 }
@@ -195,6 +197,12 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 			sess.Stock = snap.Stock
 		}
 	}
+	// 财报指标摘要（5年年报+最新期，最小事实注入）
+	if s.deps.Finance != nil && facts.StockCode != "" {
+		if res, err := s.deps.Finance(ctx, facts.StockCode, facts.Market); err == nil && res != nil && len(res.Indicators) > 0 {
+			facts.Finance = formatFinance(res.Indicators)
+		}
+	}
 	// 知识库片段
 	if s.deps.Knowledge != nil {
 		query := facts.StockName
@@ -229,6 +237,18 @@ func formatSentiment(r *types.SentimentResult) string {
 			}
 			b.WriteString("「" + it.Title + "」")
 		}
+	}
+	return b.String()
+}
+
+// formatFinance 财务指标 → 紧凑文本（报告期 | 营收 | 净利 | ROE | 毛利率 | 负债率）
+func formatFinance(items []types.FinancialIndicator) string {
+	var b strings.Builder
+	b.WriteString("最近5年年报+最新期（单位：亿元/%）：\n")
+	for _, it := range items {
+		b.WriteString(fmt.Sprintf("%s：营收%.1f(同比%+.1f%%) 净利%.1f(同比%+.1f%%) EPS%.2f ROE%.1f%% 毛利率%.1f%% 净利率%.1f%% 负债率%.1f%%\n",
+			it.ReportDate, it.Revenue, it.RevenueYoY, it.NetProfit, it.NetProfitYoY,
+			it.EPS, it.ROE, it.GrossMargin, it.NetMargin, it.DebtRatio))
 	}
 	return b.String()
 }

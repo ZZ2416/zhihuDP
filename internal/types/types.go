@@ -119,6 +119,7 @@ type ChatFacts struct {
 	Market       string // 市场（沪A/深A）
 	Quote        string // 行情快照文本（报价级）
 	Sentiment    string // 情绪面板摘要文本
+	Finance      string // 财务指标摘要（最近5年年报+最新期）
 	Knowledge    string // 知识库检索片段
 	PrevAnalysis string // 一期 AI 分析文本（中性文案）
 }

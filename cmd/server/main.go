@@ -82,6 +82,9 @@ func main() {
 		Knowledge: func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error) {
 			return zhClient.KnowledgeSearch(ctx, query, []string{"7520243014858214186"}, limit)
 		},
+		Finance: func(ctx context.Context, code, market string) (*types.FinanceResult, error) {
+			return finance.GetResult(ctx, code, market)
+		},
 		ChatAgent: func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error {
 			return agent.Chat(ctx, facts, history, message, deps, sink)
 		},
