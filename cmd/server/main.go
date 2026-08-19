@@ -187,21 +187,18 @@ type keyService struct {
 	configPath string // config.yaml 路径（上传密钥后持久化密文用）
 }
 
-// UpdateKeys 应用用户提交的密钥（空值表示该项未填写，保留原密钥）
-func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
+// UpdateKeys 应用用户提交的 DeepSeek 密钥（空值保留原密钥）
+func (k *keyService) UpdateKeys(deepseekKey string) error {
 	if deepseekKey != "" {
 		k.cfg.DeepSeek.APIKey = deepseekKey
-	}
-	if zhihuSecret != "" {
-		// 知乎密钥已随知乎数据源移除；此处仅保留 DeepSeek 密钥热更新
 	}
 	return nil
 }
 
 // PersistKeys 把加密后的密钥密文写回 config.yaml（只写 *_enc 字段，绝不落明文），
 // 重启后加载解密恢复 —— 仓库/配置泄露也只是密文。
-func (k *keyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error {
-	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc, zhihuSecretEnc)
+func (k *keyService) PersistKeys(deepseekKeyEnc string) error {
+	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc)
 }
 
 // financeProvider 财报服务适配器：数据（finance dao）+ AI 解析（agent）

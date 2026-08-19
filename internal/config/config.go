@@ -130,7 +130,7 @@ func (c *Config) String() string {
 
 // PersistEnc 把加密后的密钥密文写回 config.yaml（只写 enc 字段，绝不落明文）。
 // 用于开屏「上传密钥」后持久化：重启后加载解密恢复。
-func (c *Config) PersistEnc(path, deepseekEnc, zhihuEnc string) error {
+func (c *Config) PersistEnc(path, deepseekEnc string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -149,7 +149,6 @@ func (c *Config) PersistEnc(path, deepseekEnc, zhihuEnc string) error {
 	if deepseekEnc != "" {
 		setNested(raw, []string{"deepseek", "api_key_enc"}, deepseekEnc)
 	}
-	_ = zhihuEnc // 知乎已移除，仅兼容签名
 	out, err := yaml.Marshal(raw)
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %w", err)

@@ -56,9 +56,9 @@ func (fakeKeyService) PublicKeyPEM() string {
 
 func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []byte(b64), nil }
 
-func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
+func (fakeKeyService) UpdateKeys(deepseekKey string) error { return nil }
 
-func (fakeKeyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error { return nil }
+func (fakeKeyService) PersistKeys(deepseekKeyEnc string) error { return nil }
 
 // fakeChatProvider 二期对话桩：直接回一段 delta
 type fakeChatProvider struct{}

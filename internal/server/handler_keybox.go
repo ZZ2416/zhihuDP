@@ -46,17 +46,12 @@ func (s *Server) handleUpdateKeys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "DeepSeek 密钥解密失败"})
 		return
 	}
-	zk, err := s.keyService.DecryptOAEPBase64(req.ZhihuSecret)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "知乎密钥解密失败"})
-		return
-	}
-	if err := s.keyService.UpdateKeys(string(dk), string(zk)); err != nil {
+	if err := s.keyService.UpdateKeys(string(dk)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	// 持久化密文到 config.yaml（只写 *_enc 字段）：重启后加载解密恢复，仓库/配置无明文
-	if err := s.keyService.PersistKeys(req.DeepseekKey, req.ZhihuSecret); err != nil {
+	if err := s.keyService.PersistKeys(req.DeepseekKey); err != nil {
 		log.Printf("[keybox] 密文持久化失败: %v（密钥已热更新，重启后需重新上传）", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": true})

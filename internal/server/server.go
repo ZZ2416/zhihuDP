@@ -89,10 +89,10 @@ type KeyService interface {
 	PublicKeyPEM() string
 	// DecryptOAEPBase64 用私钥解密前端提交的 base64(RSA-OAEP 密文)；空串输入返回空
 	DecryptOAEPBase64(b64 string) ([]byte, error)
-	// UpdateKeys 接收解密后的用户密钥并热更新（deepseekKey/zhihuSecret 为空表示该项跳过）
-	UpdateKeys(deepseekKey, zhihuSecret string) error
+	// UpdateKeys 接收解密后的 DeepSeek 密钥并热更新
+	UpdateKeys(deepseekKey string) error
 	// PersistKeys 把加密后的密钥密文持久化到 config.yaml（只写 *_enc 字段，不落明文）
-	PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error
+	PersistKeys(deepseekKeyEnc string) error
 }
 
 // VideoProvider 视频资讯服务接口（由入口 videoProvider 实现）

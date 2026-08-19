@@ -175,14 +175,12 @@
   <div id="key-modal">
     <h3 id="key-modal-title">🔑 配置你的密钥</h3>
     <div class="modal-desc">
-      填入你自己的 <b>DeepSeek API Key</b> 与 <b>知乎三方 API Key</b>，数据仅由你本机使用。
+      填入你自己的 <b>DeepSeek API Key</b>，数据仅由你本机使用。
       密钥在浏览器内用 <b>RSA 公钥加密</b> 后传输，服务端私钥解密，明文不落日志。
       不填则点击「跳过」，使用内置默认密钥。
     </div>
     <label for="key-deepseek">DeepSeek API Key（可留空）</label>
     <input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
-    <label for="key-zhihu">知乎三方 API Key / Access Secret（可留空）</label>
-    <input id="key-zhihu" type="password" placeholder="access secret" autocomplete="off" spellcheck="false">
     <div class="key-actions">
       <button class="btn btn-skip" id="key-skip" onclick="skipKeys()">跳过，使用默认密钥</button>
       <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>
