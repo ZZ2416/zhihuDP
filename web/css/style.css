@@ -548,3 +548,28 @@ footer p { margin: 3px 0; }
 .wl-score em { font-style: normal; font-size: 11px; font-weight: 500; opacity: .75; margin-left: 4px; }
 .wl-rm { color: var(--faint); font-size: 15px; padding: 0 4px; cursor: pointer; }
 .wl-rm:hover { color: var(--err-text); }
+
+/* ===== 黑德文品牌标识（替换看山素材） ===== */
+.logo-hdw {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(145deg, #1a1f2e, #000);
+  color: #fff; font-weight: 800; font-size: 16px;
+  border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.mascot-hdw {
+  display: flex; align-items: center; justify-content: center;
+  width: 110px; height: 110px; border-radius: 50%;
+  background: linear-gradient(145deg, #1a1f2e 0%, #000 70%);
+  color: #fff; font-size: 52px; font-weight: 800;
+  border: 3px solid #333; box-shadow: 0 8px 30px rgba(0,0,0,.45);
+  margin: 0 auto 14px; animation: float 4s ease-in-out infinite;
+}
+.splash-hdw {
+  width: 120px; height: 120px; border-radius: 50%;
+  background: linear-gradient(145deg, #1a1f2e, #000);
+  color: #fff; font-size: 56px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 4px solid #333; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  animation: splashZoom 2s cubic-bezier(.22,.9,.3,1);
+}

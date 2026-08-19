@@ -85,14 +85,12 @@ func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink f
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
 }
 
-// fakeWatchlistProvider 自选池桩
-type fakeWatchlistProvider struct{}
+// fakeFundamentalProvider 基本面评分桩
+type fakeFundamentalProvider struct{}
 
-func (fakeWatchlistProvider) List() []types.WatchItem { return nil }
-
-func (fakeWatchlistProvider) Add(_, _ string) (int, error) { return 20, nil }
-
-func (fakeWatchlistProvider) Remove(_ string) error { return nil }
+func (fakeFundamentalProvider) GetScore(_ context.Context, code, _ string) (*types.FundamentalResult, error) {
+	return &types.FundamentalResult{Code: code, Name: "测试股", Score: types.FundamentalScore{Total: 70, Grade: "质地良好"}}, nil
+}
 
 // fakeMinuteProvider 分时桩
 type fakeMinuteProvider struct{}
@@ -116,7 +114,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeWatchlistProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

@@ -28,7 +28,6 @@ import (
 	"zhihudp/internal/types"
 	"zhihudp/internal/valuation"
 	"zhihudp/internal/video"
-	"zhihudp/internal/watchlist"
 	"zhihudp/web"
 )
 
@@ -75,12 +74,7 @@ func main() {
 		Finance:   finance.GetResult,
 		Valuation: valuation.Get,
 	})
-	// 自选池（上限 20 只，本地文件持久化；DataDir 空回退默认）
-	dataDir := cfg.Server.DataDir
-	if strings.TrimSpace(dataDir) == "" {
-		dataDir = "./data"
-	}
-	wlStore := watchlist.New(dataDir+"/watchlist.json", 20)
+	fundProvider := &fundamentalProvider{svc: fundSvc}
 	deps := buildDeps(cfg)
 	deps.FundamentalScore = fundSvc.Score
 
@@ -133,7 +127,7 @@ func main() {
 		fp,              // 财报解析（东财双源 + AI）
 		mp,              // 分时数据（东财主 + 腾讯兜底）
 		vp,              // 视频资讯（B站）
-		wlStore,         // 自选池（20 只，文件持久化）
+		fundProvider,    // 基本面评分数据（GET /api/fundamental）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -251,6 +245,18 @@ func (v *videoProvider) GetVideos(ctx context.Context, keyword string, count int
 
 // 编译期断言：videoProvider 满足 server.VideoProvider
 var _ server.VideoProvider = (*videoProvider)(nil)
+
+// fundamentalProvider 适配器：fundamental.Service → server.FundamentalProvider
+type fundamentalProvider struct {
+	svc *fundamental.Service
+}
+
+func (f *fundamentalProvider) GetScore(ctx context.Context, code, market string) (*types.FundamentalResult, error) {
+	return f.svc.Score(ctx, code, market)
+}
+
+// 编译期断言：fundamentalProvider 满足 server.FundamentalProvider
+var _ server.FundamentalProvider = (*fundamentalProvider)(nil)
 
 // 编译期断言：minuteProvider 满足 server.MinuteProvider
 var _ server.MinuteProvider = (*minuteProvider)(nil)

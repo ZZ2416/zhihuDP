@@ -18,10 +18,9 @@ function appendChatMsg(role, text, streaming) {
   const wrap = document.createElement('div');
   wrap.className = 'chat-msg ' + (role === 'user' ? 'user' : 'assistant');
   if (role === 'assistant') {
-    const av = document.createElement('img');
-    av.className = 'chat-bubble-avatar';
-    av.src = '/pic/kanshan.jpg';
-    av.alt = '看山';
+    const av = document.createElement('div');
+    av.className = 'chat-bubble-avatar chat-avatar-hdw';
+    av.textContent = '黑';
     wrap.appendChild(av);
   }
   const bubble = document.createElement('div');

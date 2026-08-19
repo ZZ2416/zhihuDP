@@ -2,6 +2,7 @@
 let analysisText = '';
 let renderTimer = null;
 let curStock = null; // 当前查看的股票（自选池「+自选」用）
+let gotFundamental = false; // 本次分析是否收到基本面评分
 
 /* ---- 视图切换 ---- */
 function showDetail() {
@@ -72,10 +73,10 @@ async function doSearch() {
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
   curStock = null;
+  gotFundamental = false;
   $('fundamental-card').classList.add('hidden');
   $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
   $('fundamental-analysis').innerHTML = '<span id="cursor" class="blink"></span>';
-  $('analysis').innerHTML = '';
   analysisText = '';
   hideError();
   $('cursor').classList.remove('hidden');
@@ -117,8 +118,14 @@ function handleEvent(event, data) {
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
-    case 'fundamental': renderFundamental(d); break;
+    case 'fundamental': gotFundamental = true; renderFundamental(d); break;
     case 'delta': appendDelta(d.text || ''); break;
+    case 'done':
+      if (!gotFundamental) {
+        $('fundamental-card').classList.remove('hidden');
+        $('fundamental-score').innerHTML = '<span style="color:var(--faint)">评分暂不可用（数据源异常）</span>';
+      }
+      break;
     case 'error': showError(d.message || '发生错误'); break;
     case 'done': break;
   }
@@ -190,7 +197,6 @@ function hotSearch(name) {
 window.addEventListener('load', () => {
   $('stock-input').focus();
   loadHomeHot();
-  loadWatchlist();
 });
 
 /* ---- 板块点击 → 成分股（复用热门股票卡片） ---- */

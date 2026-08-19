@@ -173,9 +173,3 @@ type FundamentalResult struct {
 	Score      FundamentalScore     `json:"score"`
 	Degraded   bool                 `json:"degraded"`
 }
-
-// WatchItem 自选池条目
-type WatchItem struct {
-	Code   string `json:"code"`
-	Market string `json:"market"`
-}
