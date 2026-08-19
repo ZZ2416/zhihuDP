@@ -40,7 +40,8 @@ type KeyBoxConfig struct {
 
 // ServerConfig HTTP 服务配置
 type ServerConfig struct {
-	Port int `yaml:"port"` // 默认 8080
+	Port    int    `yaml:"port"`     // 默认 8080
+	DataDir string `yaml:"data_dir"` // 本地数据目录（自选池等持久化）；默认 ./data
 }
 
 // MediaConfig 媒体目录（静态资源：演示视频等，经 /media/ 路由播放）
@@ -73,6 +74,7 @@ func defaultConfig() *Config {
 	c.KeyBox.PrivateKey = defaultKeyBoxDir() + "/zhihudp_private.pem"
 	c.Media.Dir = "" // 默认禁用；服务器上 config.yaml 配 media.dir 启用 /media/ 路由
 	c.Server.Port = 8080
+	c.Server.DataDir = "./data" // 自选池等本地数据
 	return c
 }
 

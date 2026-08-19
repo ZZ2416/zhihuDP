@@ -28,6 +28,7 @@ import (
 	"zhihudp/internal/types"
 	"zhihudp/internal/valuation"
 	"zhihudp/internal/video"
+	"zhihudp/internal/watchlist"
 	"zhihudp/web"
 )
 
@@ -74,6 +75,8 @@ func main() {
 		Finance:   finance.GetResult,
 		Valuation: valuation.Get,
 	})
+	// 自选池（上限 20 只，本地文件持久化）
+	wlStore := watchlist.New(cfg.Server.DataDir+"/watchlist.json", 20)
 	deps := buildDeps(cfg)
 	deps.FundamentalScore = fundSvc.Score
 
@@ -126,6 +129,7 @@ func main() {
 		fp,              // 财报解析（东财双源 + AI）
 		mp,              // 分时数据（东财主 + 腾讯兜底）
 		vp,              // 视频资讯（B站）
+		wlStore,         // 自选池（20 只，文件持久化）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）

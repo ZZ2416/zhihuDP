@@ -85,6 +85,15 @@ func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink f
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
 }
 
+// fakeWatchlistProvider 自选池桩
+type fakeWatchlistProvider struct{}
+
+func (fakeWatchlistProvider) List() []types.WatchItem { return nil }
+
+func (fakeWatchlistProvider) Add(_, _ string) (int, error) { return 20, nil }
+
+func (fakeWatchlistProvider) Remove(_ string) error { return nil }
+
 // fakeMinuteProvider 分时桩
 type fakeMinuteProvider struct{}
 
@@ -107,7 +116,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeWatchlistProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
