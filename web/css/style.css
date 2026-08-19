@@ -469,11 +469,24 @@ footer p { margin: 3px 0; }
 .video-item .meta { font-size: 11px; color: var(--sub); white-space: nowrap; }
 .video-item .date { font-size: 11px; color: var(--faint); white-space: nowrap; }
 
-/* ===== 相关视频卡片网格（封面） ===== */
-.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+/* ===== 相关视频卡片（横向一排，窗口内滑动） ===== */
+.video-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 220px);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;               /* Firefox 细滚动条 */
+}
+.video-grid::-webkit-scrollbar { height: 6px; }        /* Chrome/Safari */
+.video-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.video-grid::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .video-card {
   display: block; text-decoration: none; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--card); overflow: hidden; transition: transform .15s, box-shadow .15s, border-color .15s;
+  background: var(--card); overflow: hidden; scroll-snap-align: start;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
 }
 .video-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--accent); text-decoration: none; }
 .vc-pic { position: relative; aspect-ratio: 16/9; background: var(--card-soft); }
