@@ -180,3 +180,12 @@ type VideoItem struct {
 	Author      string `json:"author"`       // UP主
 	Degraded    bool   `json:"degraded"`
 }
+
+// Valuation 估值（当前值 + 历史分位）
+type Valuation struct {
+	PE           float64 `json:"pe"`             // PE(TTM)，统一东财口径
+	PB           float64 `json:"pb"`             // PB(MRQ)，腾讯
+	MarketCap    float64 `json:"market_cap"`     // 总市值（亿元），腾讯
+	PEEntPercent float64 `json:"pe_ent_percent"` // 当前 PE 历史分位 0-100；无数据 -1
+	Degraded     bool    `json:"degraded"`
+}
