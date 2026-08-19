@@ -102,3 +102,38 @@ func TestScoreE2E(t *testing.T) {
 		t.Errorf("优质 mock 总分应≥75: %d", res.Score.Total)
 	}
 }
+
+// CAGR 用实际年数（3 年数据 → 开 3 次方，而非固定 5）
+func TestCagrDynamicYears(t *testing.T) {
+	its := []types.FinancialIndicator{
+		{ReportDate: "2026中报", ReportDateFull: "2026-06-30", Revenue: 200, RevenueYoY: 20, NetProfitYoY: 20,
+			ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
+		{ReportDate: "2023年报", ReportDateFull: "2023-12-31", Revenue: 100, ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
+	}
+	// 200/100 开 3 次方 - 1 = 26%，应得到成长高分（≥70）
+	s := compute(its, &types.Valuation{PE: 15, PEEntPercent: 30})
+	if s.Growth < 70 {
+		t.Errorf("3年翻倍 CAGR=26%% 应高成长分，实际 %d", s.Growth)
+	}
+}
+
+// ROE 趋势同口径：中报 ROE 不参与对比（最近年报 vs 最早年报）
+func TestRoeTrendAnnualOnly(t *testing.T) {
+	// 中报 ROE 低（16.75）但年报 ROE 稳定（32/33）→ 趋势不应被中报拉低
+	its := []types.FinancialIndicator{
+		{ReportDate: "2026中报", ReportDateFull: "2026-06-30", ROE: 16.75},
+		{ReportDate: "2025年报", ReportDateFull: "2025-12-31", ROE: 32.5},
+		{ReportDate: "2021年报", ReportDateFull: "2021-12-31", ROE: 33.0},
+	}
+	if got := roeTrend(its); got != 0 {
+		t.Errorf("年报 ROE 32.5 vs 33 趋势应为 0，实际 %v", got)
+	}
+	// 年报 ROE 明显下滑 → -10
+	its2 := []types.FinancialIndicator{
+		{ReportDate: "2025年报", ReportDateFull: "2025-12-31", ROE: 20},
+		{ReportDate: "2021年报", ReportDateFull: "2021-12-31", ROE: 35},
+	}
+	if got := roeTrend(its2); got != -10 {
+		t.Errorf("ROE 35→20 趋势应 -10，实际 %v", got)
+	}
+}

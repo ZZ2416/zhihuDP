@@ -107,3 +107,40 @@ func TestGetValuation(t *testing.T) {
 		t.Errorf("PE=%v 分位=%v want 50/100", v.PE, v.PEEntPercent)
 	}
 }
+
+// 亏损公司：当前 PE 为负 → 分位 -1，PE 显示真实负值
+func TestGetValuationLossMaking(t *testing.T) {
+	em := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 最新 PE=-8（亏损），历史有正有负
+		_, _ = w.Write([]byte(`{"result":{"data":[
+			{"PE_TTM":-8},{"PE_TTM":10},{"PE_TTM":15},{"PE_TTM":20},{"PE_TTM":12}]}}`))
+	}))
+	defer em.Close()
+	tx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("v_sh600519=\"1~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0\""))
+	}))
+	defer tx.Close()
+	oldEM, oldTX := emValueURL, txQtURL
+	emValueURL = em.URL
+	txQtURL = tx.URL + "/q="
+	defer func() { emValueURL, txQtURL = oldEM, oldTX }()
+
+	v, err := Get(context.Background(), "600519", "沪A")
+	if err != nil {
+		t.Fatalf("Get 失败: %v", err)
+	}
+	if v.PE != -8 {
+		t.Errorf("亏损公司 PE 应为 -8，实际 %v", v.PE)
+	}
+	if v.PEEntPercent != -1 {
+		t.Errorf("亏损公司分位应 -1，实际 %v", v.PEEntPercent)
+	}
+}
+
+// 分位合法为 0（当前为历史最低）不应被误判为无分位
+func TestPercentileZeroIsValid(t *testing.T) {
+	series := []float64{10, 15, 20, 25, 30}
+	if got := percentile(series, 10); got != 20 {
+		t.Errorf("最低值分位应为 20（1/5），实际 %v", got)
+	}
+}

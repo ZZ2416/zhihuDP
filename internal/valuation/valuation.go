@@ -28,35 +28,37 @@ var (
 const percentileDays = 419
 
 // Get 获取估值：东财 PE_TTM 序列（当前 PE + 分位）主，腾讯 qt 补充 PB/市值并兜底
-func Get(ctx context.Context, market, code string) (*types.Valuation, error) {
+// 参数顺序与 finance.GetResult 一致：(ctx, code, market)
+func Get(ctx context.Context, code, market string) (*types.Valuation, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
 		return nil, fmt.Errorf("股票代码不能为空")
 	}
-	v := &types.Valuation{}
+	// PEEntPercent 初始 -1（无分位）；分位合法范围 0-100（0 = 当前为历史最低）
+	v := &types.Valuation{PEEntPercent: -1}
 
-	// 主：东财 PE_TTM 历史序列 → 当前 PE + 分位
+	// 主：东财 PE_TTM 历史序列（含负值）→ 当前 PE + 分位
 	peSeries, err := fetchEMSeries(ctx, market, code)
 	if err == nil && len(peSeries) > 0 {
-		cur := peSeries[len(peSeries)-1]
+		cur := peSeries[len(peSeries)-1] // 最新一个交易日
 		v.PE = cur
-		v.PEEntPercent = percentile(peSeries, cur)
+		if cur > 0 {
+			// 分位仅基于正 PE 序列（亏损/负 PE 无意义）
+			v.PEEntPercent = percentile(positiveOnly(peSeries), cur)
+		}
 	} else {
 		v.Degraded = true
 	}
 
-	// 腾讯 qt：PB / 市值，PE 兜底
+	// 腾讯 qt：PB / 市值，PE 兜底（东财失败或 PE 缺失时）
 	if pb, mcap, pe, txErr := fetchTx(ctx, market, code); txErr == nil {
 		v.PB = pb
 		v.MarketCap = mcap
-		if v.PE <= 0 {
+		if v.PE <= 0 && pe > 0 {
 			v.PE = pe
-			if v.PEEntPercent == 0 {
-				v.PEEntPercent = -1 // 无分位
-			}
+			// 腾讯兜底无历史序列 → 分位保持 -1
 		}
 	} else if err != nil {
-		// 双源失败
 		return nil, fmt.Errorf("估值获取失败（东财:%v 腾讯:%v）", err, txErr)
 	}
 
@@ -65,6 +67,17 @@ func Get(ctx context.Context, market, code string) (*types.Valuation, error) {
 		v.PEEntPercent = -1
 	}
 	return v, nil
+}
+
+// positiveOnly 过滤正 PE 序列（分位计算用）
+func positiveOnly(series []float64) []float64 {
+	out := make([]float64, 0, len(series))
+	for _, v := range series {
+		if v > 0 {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // fetchEMSeries 东财每日 PE_TTM 序列（升序日期，取最近 percentileDays 条）
@@ -93,12 +106,10 @@ func fetchEMSeries(ctx context.Context, market, code string) ([]float64, error) 
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("东财估值解析失败: %w", err)
 	}
-	// 返回降序（最新在前），翻转为升序（旧→新），当前值 = 最后一条
+	// 返回降序（最新在前），翻转为升序（旧→新）；保留负 PE（当前 PE 取真实最新值，分位另过滤）
 	series := make([]float64, 0, len(resp.Result.Data))
 	for _, d := range resp.Result.Data {
-		if d.PE_TTM > 0 {
-			series = append(series, d.PE_TTM)
-		}
+		series = append(series, d.PE_TTM)
 	}
 	for i, j := 0, len(series)-1; i < j; i, j = i+1, j-1 {
 		series[i], series[j] = series[j], series[i]

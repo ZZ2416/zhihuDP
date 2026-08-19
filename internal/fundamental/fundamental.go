@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"zhihudp/internal/types"
 )
@@ -18,10 +19,10 @@ const (
 	wValuat = 0.20
 )
 
-// Deps 依赖注入（测试可替换）
+// Deps 依赖注入（测试可替换）；参数顺序统一 (ctx, code, market)
 type Deps struct {
 	Finance   func(ctx context.Context, code, market string) (*types.FinanceResult, error)
-	Valuation func(ctx context.Context, market, code string) (*types.Valuation, error)
+	Valuation func(ctx context.Context, code, market string) (*types.Valuation, error)
 }
 
 // Service 基本面评分服务
@@ -38,7 +39,7 @@ func (s *Service) Score(ctx context.Context, code, market string) (*types.Fundam
 	if err != nil {
 		return nil, fmt.Errorf("财务数据: %w", err)
 	}
-	val, err := s.deps.Valuation(ctx, market, code)
+	val, err := s.deps.Valuation(ctx, code, market)
 	if err != nil {
 		// 估值失败不阻塞评分（估值维 50 + 标注）
 		val = &types.Valuation{PE: 0, PEEntPercent: -1, Degraded: true}
@@ -79,25 +80,18 @@ func compute(indicators []types.FinancialIndicator, v *types.Valuation) types.Fu
 		roe := lin(latest.ROE, []float64{0, 5, 10, 15, 20, 25}, []float64{10, 30, 50, 70, 85, 100})
 		gm := lin(latest.GrossMargin, []float64{10, 15, 25, 40, 60}, []float64{25, 40, 55, 75, 100})
 		nm := lin(latest.NetMargin, []float64{0, 5, 10, 20, 30}, []float64{20, 40, 60, 80, 100})
-		trend := 0.0
-		if base.ROE > 0 && latest.ROE > 0 {
-			if latest.ROE-base.ROE >= 5 {
-				trend = 10
-			} else if base.ROE-latest.ROE >= 5 {
-				trend = -10
-			}
-		}
+		trend := roeTrend(indicators) // 年报 vs 年报（同口径，中报不参与对比）
 		s.Profit = int(clamp(roe*0.4 + gm*0.3 + nm*0.3 + trend))
 	} else {
 		weights["profit"] = 0
 		s.NoData = append(s.NoData, "盈利")
 	}
 
-	// 成长：5年营收CAGR + 最近净利同比
+	// 成长：营收 CAGR（按实际年数）+ 最近净利同比
 	if (base.Revenue > 0 && latest.Revenue > 0) || latest.NetProfitYoY != 0 {
 		cagr := 0.0
 		if base.Revenue > 0 && latest.Revenue > 0 {
-			years := 5.0
+			years := yearDiff(latest.ReportDateFull, base.ReportDateFull) // 实际年数（≥1）
 			cagr = math.Pow(latest.Revenue/base.Revenue, 1/years)*100 - 100
 		}
 		cg := lin(cagr, []float64{0, 5, 10, 15, 20, 30}, []float64{15, 35, 50, 65, 80, 100})
@@ -154,6 +148,53 @@ func compute(indicators []types.FinancialIndicator, v *types.Valuation) types.Fu
 	s.Total = int(clamp(sum / totalW))
 	s.Grade = gradeOf(s.Total)
 	return s
+}
+
+// yearDiff 两个报告期（YYYY-MM-DD）的年份差（≥1）
+func yearDiff(a, b string) float64 {
+	ya, yb := 0, 0
+	if len(a) >= 4 {
+		fmt.Sscanf(a, "%d", &ya)
+	}
+	if len(b) >= 4 {
+		fmt.Sscanf(b, "%d", &yb)
+	}
+	d := ya - yb
+	if d < 1 {
+		d = 1
+	}
+	return float64(d)
+}
+
+// roeTrend 年报 ROE 趋势：最近年报 vs 最早年报（同口径；无两期年报则 0）
+func roeTrend(indicators []types.FinancialIndicator) float64 {
+	var latestAnnual, earliestAnnual *types.FinancialIndicator
+	for i := range indicators {
+		it := &indicators[i]
+		if !strings.HasSuffix(it.ReportDateFull, "-12-31") {
+			continue
+		}
+		if latestAnnual == nil || it.ReportDateFull > latestAnnual.ReportDateFull {
+			latestAnnual = it
+		}
+		if earliestAnnual == nil || it.ReportDateFull < earliestAnnual.ReportDateFull {
+			earliestAnnual = it
+		}
+	}
+	if latestAnnual == nil || earliestAnnual == nil || latestAnnual == earliestAnnual {
+		return 0
+	}
+	// 未披露完整年报时（如最新期只有中报），用最近年报
+	if latestAnnual.ROE <= 0 || earliestAnnual.ROE <= 0 {
+		return 0
+	}
+	if latestAnnual.ROE-earliestAnnual.ROE >= 5 {
+		return 10
+	}
+	if earliestAnnual.ROE-latestAnnual.ROE >= 5 {
+		return -10
+	}
+	return 0
 }
 
 // gradeOf 总分定性
