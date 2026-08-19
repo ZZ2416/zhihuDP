@@ -82,6 +82,7 @@ function renderKline(candles, quote) {
   svg += '<rect id="k-hl" fill="var(--accent-weak)" opacity="0.55" visibility="hidden"/>';
 
   el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;touch-action:none">' + svg + '</svg>';
+  window.__lastKlineData = { candles: candles, quote: quote }; // 缓存日K数据（切回时重新渲染恢复交互）
 
   // 明细浮层（HTML 覆盖层）
   let tip = el.querySelector('.kline-tip');
@@ -166,4 +167,208 @@ function renderKlineError() {
   const el = $('kline-chart');
   el.innerHTML = '<div class="degraded" style="margin-top:12px">行情数据加载失败，请稍后重试</div>';
   el._k = null;
+}
+
+/* ===== 分时图（日K/分时 切换，懒加载） ===== */
+let minuteCache = null; // {code, market, data}
+
+let minuteTimer = null; // 分时轮询定时器
+
+/* 分时实时刷新：分时 tab 激活时每 30s 拉一次最新数据重绘（保留交互） */
+const MINUTE_REFRESH_MS = 30000;
+function startMinuteRefresh() {
+  stopMinuteRefresh();
+  minuteTimer = setInterval(() => {
+    if (document.hidden) return;            // 页面隐藏时暂停
+    if (!$('tab-minute') || !$('tab-minute').classList.contains('active')) return; // 不在分时 tab
+    if (!minuteCache) return;
+    refreshMinute();
+  }, MINUTE_REFRESH_MS);
+}
+function stopMinuteRefresh() {
+  if (minuteTimer) { clearInterval(minuteTimer); minuteTimer = null; }
+}
+async function refreshMinute() {
+  try {
+    const data = await apiMinute(minuteCache.code, minuteCache.market);
+    if (!data || !data.points || !data.points.length) return;
+    minuteCache.data = data;
+    if ($('tab-minute') && $('tab-minute').classList.contains('active')) renderMinute(data);
+  } catch (e) { /* 静默，下轮重试 */ }
+}
+
+/* 切换日K/分时 */
+async function switchKline(mode) {
+  const dayBtn = $('tab-day'), minBtn = $('tab-minute');
+  if (mode === 'minute') {
+    dayBtn.classList.remove('active');
+    minBtn.classList.add('active');
+    startMinuteRefresh();
+    if (!minuteCache) {
+      const code = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
+      const market = $('stock-head') ? ($('stock-head').querySelector('.market') || {}).textContent : '';
+      if (!code) return;
+      $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">加载分时数据…</div>';
+      try {
+        const data = await apiMinute(code, market);
+        if (!data || !data.points || !data.points.length) { $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">暂无分时数据</div>'; return; }
+        minuteCache = { code, market, data };
+        renderMinute(data);
+      } catch (e) {
+        $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">分时加载失败，请稍后重试</div>';
+      }
+    } else {
+      renderMinute(minuteCache.data);
+    }
+  } else {
+    minBtn.classList.remove('active');
+    dayBtn.classList.add('active');
+    stopMinuteRefresh(); // 切回日K 停止分时轮询
+    if (window.__lastKlineData) { // 用缓存数据重新渲染（恢复交互绑定）
+      renderKline(window.__lastKlineData.candles, window.__lastKlineData.quote);
+    }
+  }
+}
+
+/* 分时 SVG：价格线 + 均价线 + 昨收虚线（涨红跌绿） */
+function renderMinute(data) {
+  const pts = data.points;
+  const n = pts.length;
+  const W = 860, H = 340, padL = 58, padR = 12, padT = 18;
+  const plotW = W - padL - padR;
+  const pre = data.pre_close || pts[0].price;
+  const cw = plotW / n;
+  const x = i => padL + i * cw + cw / 2;
+
+  let min = Infinity, max = -Infinity;
+  for (const p of pts) {
+    if (p.price < min) min = p.price;
+    if (p.price > max) max = p.price;
+    if (p.avg_price > 0 && p.avg_price < min) min = p.avg_price;
+    if (p.avg_price > 0 && p.avg_price > max) max = p.avg_price;
+  }
+  if (pre < min) min = pre;
+  if (pre > max) max = pre;
+  const pad = (max - min) * 0.08 || 1;
+  min -= pad; max += pad;
+  const y = v => padT + (max - v) / (max - min) * (H - 40 - padT);
+
+  const line = (get, color, w) => {
+    const pts2 = [];
+    for (let i = 0; i < n; i++) {
+      const v = get(pts[i]);
+      if (v > 0) pts2.push(x(i).toFixed(1) + ',' + y(v).toFixed(1));
+    }
+    return '<polyline points="' + pts2.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="' + (w || 1.5) + '"/>';
+  };
+  const up = pts[n - 1].price >= pre;
+  const priceColor = up ? 'var(--bull)' : 'var(--bear)';
+
+  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block">';
+  // 网格 + 刻度
+  const gl = 4;
+  for (let i = 0; i <= gl; i++) {
+    const v = min + (max - min) * i / gl, yy = y(v);
+    svg += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--border)" stroke-width="1"/>';
+    svg += '<text x="' + (padL - 6) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10" fill="var(--faint)">' + v.toFixed(2) + '</text>';
+  }
+  // 昨收虚线
+  const py = y(pre);
+  svg += '<line x1="' + padL + '" y1="' + py + '" x2="' + (W - padR) + '" y2="' + py + '" stroke="var(--neutral)" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (padL + 4) + '" y="' + (py - 4) + '" font-size="10" fill="var(--neutral)">昨收 ' + pre.toFixed(2) + '</text>';
+  // 均价线
+  svg += line(p => p.avg_price, '#f7b731', 1.3);
+  // 价格线（渐变填充面积可选，简单折线）
+  svg += line(p => p.price, priceColor, 1.8);
+  // 底部时间刻度
+  const times = [pts[0].time, '10:30', '11:30/13:00', '14:00', pts[n - 1].time];
+  times.forEach((t, i) => {
+    const tx = padL + plotW * i / (times.length - 1);
+    svg += '<text x="' + tx + '" y="' + (H - 14) + '" text-anchor="' + (i === 0 ? 'start' : i === times.length - 1 ? 'end' : 'middle') + '" font-size="10" fill="var(--faint)">' + t + '</text>';
+  });
+  // 右上角涨跌
+  const chg = pts[n - 1].price - pre;
+  const chgPct = pre ? (chg / pre * 100) : 0;
+  svg += '<text x="' + (W - padR) + '" y="' + (padT + 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + priceColor + '">' +
+    (up ? '+' : '') + chg.toFixed(2) + '  (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</text>';
+
+  // ---- 交互层：十字光标 + 高亮（初始隐藏，id 加 mv- 前缀避免与日K冲突） ----
+  svg += '<line id="mv-line" stroke="var(--faint)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  svg += '<line id="mh-line" stroke="var(--faint)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  svg += '<rect id="m-hl" fill="var(--accent-weak)" opacity="0.4" visibility="hidden"/>';
+  svg += '</svg>';
+
+  const el = $('kline-chart');
+  el.innerHTML = svg;
+
+  // 明细浮层（复用 .kline-tip 样式）
+  let tip = el.querySelector('.kline-tip');
+  if (!tip) { tip = document.createElement('div'); tip.className = 'kline-tip'; tip.style.display = 'none'; el.appendChild(tip); }
+  el._m = {
+    svg: el.querySelector('svg'), pts, tip, pre,
+    vline: el.querySelector('#mv-line'), hline: el.querySelector('#mh-line'), hl: el.querySelector('#m-hl'),
+    W, H, padL, padR, padT, cw, min, max, n, locked: false
+  };
+  const svgEl = el._m.svg;
+  svgEl.addEventListener('mousemove', e => { if (!el._m.locked) minuteHover(e, false); });
+  svgEl.addEventListener('mouseleave', () => { if (!el._m.locked) minuteHide(); });
+  svgEl.addEventListener('touchstart', e => { e.preventDefault(); minuteHover(e, true); }, { passive: false });
+  svgEl.addEventListener('click', () => { el._m.locked = !el._m.locked; if (!el._m.locked) minuteHide(); });
+}
+
+/* ---- 分时悬停：十字光标 + 明细（时间/价格/涨跌幅/均价/成交量） ---- */
+function minuteHover(e, lock) {
+  const m = $('kline-chart')._m;
+  if (!m) return;
+  const rect = m.svg.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (m.W / rect.width);
+  const py = (e.clientY - rect.top) * (m.H / rect.height);
+  const idx = Math.round((px - m.padL) / m.cw);
+  if (idx < 0 || idx >= m.n) { minuteHide(); return; }
+
+  const p = m.pts[idx];
+  const cx = m.padL + idx * m.cw + m.cw / 2;
+  const cy = m.padT + (m.max - p.price) / (m.max - m.min) * (m.H - 40 - m.padT);
+
+  // 十字光标 + 高亮列
+  m.vline.setAttribute('x1', cx); m.vline.setAttribute('x2', cx);
+  m.vline.setAttribute('y1', m.padT); m.vline.setAttribute('y2', m.H - 30);
+  m.vline.setAttribute('visibility', 'visible');
+  m.hline.setAttribute('x1', m.padL); m.hline.setAttribute('x2', m.W - m.padR);
+  m.hline.setAttribute('y1', py); m.hline.setAttribute('y2', py);
+  m.hline.setAttribute('visibility', 'visible');
+  m.hl.setAttribute('x', cx - m.cw / 2); m.hl.setAttribute('width', m.cw);
+  m.hl.setAttribute('y', m.padT); m.hl.setAttribute('height', m.H - 30 - m.padT);
+  m.hl.setAttribute('visibility', 'visible');
+
+  // 明细浮层
+  const chg = p.price - m.pre;
+  const chgPct = m.pre ? (chg / m.pre * 100) : 0;
+  const up = chg >= 0;
+  const color = up ? 'var(--bull)' : 'var(--bear)';
+  m.tip.innerHTML =
+    '<div class="d">' + esc(p.time) + '</div>' +
+    '<div class="row"><span>价 <b style="color:' + color + '">' + p.price.toFixed(2) + '</b></span>' +
+    '<span style="color:' + color + '">' + (up ? '+' : '') + chg.toFixed(2) + ' (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</span></div>' +
+    '<div class="row"><span>均价 <b>' + (p.avg_price > 0 ? p.avg_price.toFixed(2) : '—') + '</b></span>' +
+    '<span>量 <b>' + (p.volume >= 10000 ? (p.volume / 10000).toFixed(1) + '万手' : p.volume + '手') + '</b></span></div>';
+  m.tip.style.display = 'block';
+
+  // 浮层定位（防溢出）
+  const cssX = (e.clientX - rect.left);
+  const cssY = (e.clientY - rect.top);
+  let left = cssX + 14, top = cssY - 70;
+  if (left + 170 > rect.width) left = cssX - 184;
+  if (top < 4) top = 4;
+  m.tip.style.left = left + 'px';
+  m.tip.style.top = top + 'px';
+}
+
+function minuteHide() {
+  const m = $('kline-chart')._m;
+  if (!m) return;
+  m.vline.setAttribute('visibility', 'hidden');
+  m.hline.setAttribute('visibility', 'hidden');
+  m.hl.setAttribute('visibility', 'hidden');
+  m.tip.style.display = 'none';
 }

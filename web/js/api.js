@@ -67,3 +67,15 @@ async function apiFinanceAnalyze(code, market) {
     body: JSON.stringify({ code, market: market || '' })
   });
 }
+
+async function apiMinute(code, market) {
+  const resp = await fetch('/api/minute?code=' + encodeURIComponent(code) + '&market=' + encodeURIComponent(market || ''));
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+async function apiVideo(keyword, count) {
+  const resp = await fetch('/api/video?keyword=' + encodeURIComponent(keyword) + '&count=' + (count || 5));
+  if (!resp.ok) return null;
+  return resp.json();
+}

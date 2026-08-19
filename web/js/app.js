@@ -51,15 +51,23 @@ async function doSearch() {
   btn.disabled = true;
   hideSuggest();
 
-  $('stock-head').innerHTML = '';
+  $('stock-head').innerHTML =
+    '<span class="name">正在查询 ' + esc(stock) + '…</span>' +
+    '<span class="fresh" style="color:var(--faint)">识别中</span>';
   $('quote-card').classList.add('hidden');
   $('quote-body').innerHTML = '';
   $('kline-chart').innerHTML = '';
+  minuteCache = null; // 分时缓存重置（新股票重新加载）
+  window.__lastKlineData = null;
+  stopMinuteRefresh(); // 停止分时轮询
+  if ($('tab-day')) { $('tab-day').classList.add('active'); $('tab-minute').classList.remove('active'); }
   $('news-card').classList.add('hidden');
   $('news-body').innerHTML = '';
   $('finance-card').classList.add('hidden');   // 财报卡片：切股重置
   $('finance-table').innerHTML = '';
   $('finance-analysis').innerHTML = '';
+  $('video-card').classList.add('hidden');      // 视频卡片：切股重置
+  $('video-body').innerHTML = '';
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
   $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
@@ -100,6 +108,8 @@ function handleEvent(event, data) {
       fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
       fetchNews(d.name);            // 异步拉相关资讯（辅助，失败静默）
       loadFinance(d.code, d.market); // 财报解析：指标 + AI 解析（东财双源）
+      loadVideo(d.name);             // 相关视频（B站，封面卡片横滑）
+
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
     case 'sentiment': renderSentiment(d); break;
