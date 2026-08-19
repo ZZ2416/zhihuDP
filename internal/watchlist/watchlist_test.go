@@ -71,3 +71,23 @@ func TestLoadTruncate(t *testing.T) {
 		t.Fatalf("加载应截断为 3，实际 %d", got)
 	}
 }
+
+// 上限满时 Add 报错
+func TestAddFull(t *testing.T) {
+	dir := t.TempDir()
+	s := New(filepath.Join(dir, "wl.json"), 2)
+	s.Add("600519", "沪A")
+	s.Add("000001", "深A")
+	if _, err := s.Add("300750", "深A"); err == nil {
+		t.Fatal("上限满应报错")
+	}
+}
+
+// 空列表返回 []（非 nil）
+func TestEmptyList(t *testing.T) {
+	dir := t.TempDir()
+	s := New(filepath.Join(dir, "wl.json"), 20)
+	if got := s.List(); got == nil || len(got) != 0 {
+		t.Fatalf("空列表应为空 slice，实际 %v", got)
+	}
+}

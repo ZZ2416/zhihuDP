@@ -75,8 +75,12 @@ func main() {
 		Finance:   finance.GetResult,
 		Valuation: valuation.Get,
 	})
-	// 自选池（上限 20 只，本地文件持久化）
-	wlStore := watchlist.New(cfg.Server.DataDir+"/watchlist.json", 20)
+	// 自选池（上限 20 只，本地文件持久化；DataDir 空回退默认）
+	dataDir := cfg.Server.DataDir
+	if strings.TrimSpace(dataDir) == "" {
+		dataDir = "./data"
+	}
+	wlStore := watchlist.New(dataDir+"/watchlist.json", 20)
 	deps := buildDeps(cfg)
 	deps.FundamentalScore = fundSvc.Score
 
