@@ -69,11 +69,20 @@ Browser -> Browser: 切回日K → 用 window.__lastKline 缓存重画（不重�
 - 串行取主备（东财并发易触发风控，finance 同经验）
 - `http.Client{Timeout: 6s}` + 浏览器 UA
 
-### 6.2 前端（kline.js）
+### 6.2 前端交互（kline.js）
+- **分时**：SVG 内置十字光标（`#mv-line/#mh-line/#m-hl`）+ HTML 明细浮层（复用 `.kline-tip`）；`el._m` 存几何上下文；`mousemove/touchstart → minuteHover`（十字光标 + 时间/价格/涨跌幅/均价/成交量），`click` 锁定，`mouseleave → minuteHide`
+- **日K 切回修复**：切回日K 用缓存数据 `__lastKlineData` **重新调用 renderKline**（而非重填 innerHTML），恢复十字光标与事件绑定
+
+### 6.3 前端切换（kline.js）
 - 切换按钮：`#tab-day` / `#tab-minute`（`.kline-tabs`）
 - `switchKline(mode)`：分时懒加载（`apiMinute` → `renderMinute`，结果缓存 `minuteCache`）；日K 用 `window.__lastKline` 缓存重画
 - `renderMinute(data)`：SVG 折线——价格线（相对昨收红涨绿跌）+ 均价线（黄）+ 昨收虚线 + 右上角涨跌幅 + 底部时间刻度
 - 切股重置：`doSearch` 清 `minuteCache` / `window.__lastKline` / 切回日K tab
+
+## 6.4 数据结构备注
+- `window.__lastKlineData = {candles, quote}`（日K 数据缓存，切回重新渲染）
+- `window.minuteCache`（分时数据缓存，懒加载一次）
+- `el._m`（分时交互几何上下文）/ `el._k`（日K 交互上下文）互不干扰
 
 ## 7. 文件改动清单
 

@@ -56,7 +56,7 @@ async function doSearch() {
   $('quote-body').innerHTML = '';
   $('kline-chart').innerHTML = '';
   minuteCache = null; // 分时缓存重置（新股票重新加载）
-  window.__lastKline = '';
+  window.__lastKlineData = null;
   if ($('tab-day')) { $('tab-day').classList.add('active'); $('tab-minute').classList.remove('active'); }
   $('news-card').classList.add('hidden');
   $('news-body').innerHTML = '';

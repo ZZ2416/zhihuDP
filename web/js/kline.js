@@ -82,7 +82,7 @@ function renderKline(candles, quote) {
   svg += '<rect id="k-hl" fill="var(--accent-weak)" opacity="0.55" visibility="hidden"/>';
 
   el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;touch-action:none">' + svg + '</svg>';
-  window.__lastKline = el.innerHTML; // 缓存日K SVG（切回时重画）
+  window.__lastKlineData = { candles: candles, quote: quote }; // 缓存日K数据（切回时重新渲染恢复交互）
 
   // 明细浮层（HTML 覆盖层）
   let tip = el.querySelector('.kline-tip');
@@ -197,8 +197,8 @@ async function switchKline(mode) {
   } else {
     minBtn.classList.remove('active');
     dayBtn.classList.add('active');
-    if (window.__lastKline) { // 重画最近一次日K（缓存数据）
-      $('kline-chart').innerHTML = window.__lastKline;
+    if (window.__lastKlineData) { // 用缓存数据重新渲染（恢复交互绑定）
+      renderKline(window.__lastKlineData.candles, window.__lastKlineData.quote);
     }
   }
 }
@@ -264,6 +264,84 @@ function renderMinute(data) {
   const chgPct = pre ? (chg / pre * 100) : 0;
   svg += '<text x="' + (W - padR) + '" y="' + (padT + 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + priceColor + '">' +
     (up ? '+' : '') + chg.toFixed(2) + '  (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</text>';
+
+  // ---- 交互层：十字光标 + 高亮（初始隐藏，id 加 mv- 前缀避免与日K冲突） ----
+  svg += '<line id="mv-line" stroke="var(--faint)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  svg += '<line id="mh-line" stroke="var(--faint)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>';
+  svg += '<rect id="m-hl" fill="var(--accent-weak)" opacity="0.4" visibility="hidden"/>';
   svg += '</svg>';
-  $('kline-chart').innerHTML = svg;
+
+  const el = $('kline-chart');
+  el.innerHTML = svg;
+
+  // 明细浮层（复用 .kline-tip 样式）
+  let tip = el.querySelector('.kline-tip');
+  if (!tip) { tip = document.createElement('div'); tip.className = 'kline-tip'; tip.style.display = 'none'; el.appendChild(tip); }
+  el._m = {
+    svg: el.querySelector('svg'), pts, tip, pre,
+    vline: el.querySelector('#mv-line'), hline: el.querySelector('#mh-line'), hl: el.querySelector('#m-hl'),
+    W, H, padL, padR, padT, cw, min, max, n, locked: false
+  };
+  const svgEl = el._m.svg;
+  svgEl.addEventListener('mousemove', e => { if (!el._m.locked) minuteHover(e, false); });
+  svgEl.addEventListener('mouseleave', () => { if (!el._m.locked) minuteHide(); });
+  svgEl.addEventListener('touchstart', e => { e.preventDefault(); minuteHover(e, true); }, { passive: false });
+  svgEl.addEventListener('click', () => { el._m.locked = !el._m.locked; if (!el._m.locked) minuteHide(); });
+}
+
+/* ---- 分时悬停：十字光标 + 明细（时间/价格/涨跌幅/均价/成交量） ---- */
+function minuteHover(e, lock) {
+  const m = $('kline-chart')._m;
+  if (!m) return;
+  const rect = m.svg.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (m.W / rect.width);
+  const py = (e.clientY - rect.top) * (m.H / rect.height);
+  const idx = Math.round((px - m.padL) / m.cw);
+  if (idx < 0 || idx >= m.n) { minuteHide(); return; }
+
+  const p = m.pts[idx];
+  const cx = m.padL + idx * m.cw + m.cw / 2;
+  const cy = m.padT + (m.max - p.price) / (m.max - m.min) * (m.H - 40 - m.padT);
+
+  // 十字光标 + 高亮列
+  m.vline.setAttribute('x1', cx); m.vline.setAttribute('x2', cx);
+  m.vline.setAttribute('y1', m.padT); m.vline.setAttribute('y2', m.H - 30);
+  m.vline.setAttribute('visibility', 'visible');
+  m.hline.setAttribute('x1', m.padL); m.hline.setAttribute('x2', m.W - m.padR);
+  m.hline.setAttribute('y1', py); m.hline.setAttribute('y2', py);
+  m.hline.setAttribute('visibility', 'visible');
+  m.hl.setAttribute('x', cx - m.cw / 2); m.hl.setAttribute('width', m.cw);
+  m.hl.setAttribute('y', m.padT); m.hl.setAttribute('height', m.H - 30 - m.padT);
+  m.hl.setAttribute('visibility', 'visible');
+
+  // 明细浮层
+  const chg = p.price - m.pre;
+  const chgPct = m.pre ? (chg / m.pre * 100) : 0;
+  const up = chg >= 0;
+  const color = up ? 'var(--bull)' : 'var(--bear)';
+  m.tip.innerHTML =
+    '<div class="d">' + esc(p.time) + '</div>' +
+    '<div class="row"><span>价 <b style="color:' + color + '">' + p.price.toFixed(2) + '</b></span>' +
+    '<span style="color:' + color + '">' + (up ? '+' : '') + chg.toFixed(2) + ' (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</span></div>' +
+    '<div class="row"><span>均价 <b>' + (p.avg_price > 0 ? p.avg_price.toFixed(2) : '—') + '</b></span>' +
+    '<span>量 <b>' + (p.volume >= 10000 ? (p.volume / 10000).toFixed(1) + '万手' : p.volume + '手') + '</b></span></div>';
+  m.tip.style.display = 'block';
+
+  // 浮层定位（防溢出）
+  const cssX = (e.clientX - rect.left);
+  const cssY = (e.clientY - rect.top);
+  let left = cssX + 14, top = cssY - 70;
+  if (left + 170 > rect.width) left = cssX - 184;
+  if (top < 4) top = 4;
+  m.tip.style.left = left + 'px';
+  m.tip.style.top = top + 'px';
+}
+
+function minuteHide() {
+  const m = $('kline-chart')._m;
+  if (!m) return;
+  m.vline.setAttribute('visibility', 'hidden');
+  m.hline.setAttribute('visibility', 'hidden');
+  m.hl.setAttribute('visibility', 'hidden');
+  m.tip.style.display = 'none';
 }
