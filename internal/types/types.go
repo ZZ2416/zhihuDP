@@ -16,7 +16,7 @@ type StockInfo struct {
 	Market string `json:"market"` // 如 沪A / 深A / 北A
 }
 
-// Event 对外事件（SSE 事件协议：stock / delta / done / error）
+// Event 对外事件（SSE 事件协议：stock / fundamental / delta / done / error）
 type Event struct {
 	Type string
 	Data any

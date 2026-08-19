@@ -17,6 +17,7 @@ import (
 	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
 	"zhihudp/internal/finance"
+	"zhihudp/internal/fundamental"
 	"zhihudp/internal/hot"
 	"zhihudp/internal/keybox"
 	"zhihudp/internal/kline"
@@ -25,6 +26,7 @@ import (
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
+	"zhihudp/internal/valuation"
 	"zhihudp/internal/video"
 	"zhihudp/web"
 )
@@ -67,7 +69,13 @@ func main() {
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
 	ks := &keyService{KeyBox: kb, cfg: cfg, configPath: *configPath}
+	// 基本面评分服务（财务东财 + 估值腾讯/东财分位）
+	fundSvc := fundamental.New(fundamental.Deps{
+		Finance:   finance.GetResult,
+		Valuation: valuation.Get,
+	})
 	deps := buildDeps(cfg)
+	deps.FundamentalScore = fundSvc.Score
 
 	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
 	chatSvc := chat.New(chat.NewStore(10), chat.Deps{
@@ -310,7 +318,13 @@ func buildDeps(cfg *config.Config) agent.Deps {
 
 // runCLI 命令行模式：跑一次分析，打印事件
 func runCLI(query string, cfg *config.Config) {
+	fundSvc := fundamental.New(fundamental.Deps{
+		Finance:   finance.GetResult,
+		Valuation: valuation.Get,
+	})
 	deps := buildDeps(cfg)
+	deps.FundamentalScore = fundSvc.Score
+	deps.FundamentalScore = fundSvc.Score
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {

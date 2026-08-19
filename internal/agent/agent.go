@@ -23,7 +23,8 @@ import (
 
 // Deps agent 依赖（由 cmd/server 组装注入，避免全局状态）
 type Deps struct {
-	ResolveStock func(ctx context.Context, query string) (*types.StockInfo, error)
+	ResolveStock     func(ctx context.Context, query string) (*types.StockInfo, error)
+	FundamentalScore func(ctx context.Context, code, market string) (*types.FundamentalResult, error)
 	// DeepSeek 配置 getter：每次调用取最新（支持密钥热更新）
 	DeepSeek func() config.DeepSeekConfig
 }
@@ -121,6 +122,24 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		return nil, fmt.Errorf("构建 resolve_stock 工具失败: %w", err)
 	}
 
+	fundTool, err := utils.InferTool("analyze_fundamental",
+		"分析股票基本面，返回四维评分（盈利/成长/财务健康/估值）、财务指标与估值数据。",
+		func(ctx context.Context, req *struct {
+			Code   string `json:"code" jsonschema_description:"股票代码，如 600519"`
+			Market string `json:"market" jsonschema_description:"市场，如 沪A/深A"`
+		}) (string, error) {
+			result, err := deps.FundamentalScore(ctx, req.Code, req.Market)
+			if err != nil {
+				return "", err
+			}
+			_ = sink(types.Event{Type: "fundamental", Data: result})
+			b, _ := json.Marshal(result)
+			return string(b), nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("构建 analyze_fundamental 工具失败: %w", err)
+	}
+
 	cm, err := newDeepSeekModel(ctx, deps.DeepSeek())
 	if err != nil {
 		return nil, fmt.Errorf("构建 DeepSeek 模型失败: %w", err)
@@ -129,12 +148,20 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "stock-analysis-agent",
 		Instruction: `你是股票基本面分析助手。流程固定：
-1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具。
-严格约束：不推荐买卖、不评股价、不给目标价，不用「概率/胜率/预测」措辞；不编造数据。`,
+1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具；
+2) 再调用 analyze_fundamental 获取四维评分、财务指标与估值；
+3) 基于返回的 JSON 撰写基本面解读，分五段：
+   一、综合质地（引用 score.total 总分与 grade 定性）；
+   二、盈利能力（ROE/毛利率/净利率水平与趋势）；
+   三、成长性（营收/净利同比与历史趋势）；
+   四、财务健康（资产负债率/经营现金流）；
+   五、估值与风险（PE 历史分位、PB；注明分位仅供参考，未做行业对比）。
+若返回 degraded=true 或 err_msg 非空，如实说明数据不足，不要编造。
+严格约束：不推荐买卖、不评股价、不给目标价，不用「概率/胜率/预测」措辞；不编造返回 JSON 中不存在的数值；文末注明「数据来源东方财富/腾讯，不构成投资建议」。`,
 		Model: cm,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
-				Tools: []tool.BaseTool{resolveTool},
+				Tools: []tool.BaseTool{resolveTool, fundTool},
 			},
 		},
 		MaxIterations: 5,
