@@ -1,6 +1,7 @@
 /* app.js —— 应用入口：视图切换 / 搜索联想 / SSE 事件分发 / 分析流式状态 */
 let analysisText = '';
 let renderTimer = null;
+let curStock = null; // 当前查看的股票（自选池「+自选」用）
 
 /* ---- 视图切换 ---- */
 function showDetail() {
@@ -70,7 +71,10 @@ async function doSearch() {
   $('video-body').innerHTML = '';
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
-  $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
+  curStock = null;
+  $('fundamental-card').classList.add('hidden');
+  $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
+  $('fundamental-analysis').innerHTML = '<span id="cursor" class="blink"></span>';
   $('analysis').innerHTML = '';
   analysisText = '';
   hideError();
@@ -100,6 +104,7 @@ function handleEvent(event, data) {
   try { d = data ? JSON.parse(data) : {}; } catch (e) {}
   switch (event) {
     case 'stock':
+      curStock = { code: d.code, market: d.market, name: d.name };
       $('stock-head').innerHTML =
         '<span class="name">' + esc(d.name || '') + '</span>' +
         '<span class="code">' + esc(d.code || '') + '</span>' +
@@ -112,7 +117,7 @@ function handleEvent(event, data) {
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
-    case 'sentiment': renderSentiment(d); break;
+    case 'fundamental': renderFundamental(d); break;
     case 'delta': appendDelta(d.text || ''); break;
     case 'error': showError(d.message || '发生错误'); break;
     case 'done': break;
@@ -141,11 +146,11 @@ async function fetchNews(name) {
 function appendDelta(text) {
   analysisText += text;
   if (renderTimer) return;
-  renderTimer = setTimeout(() => { renderTimer = null; $('analysis').innerHTML = renderMarkdown(analysisText); }, 80);
+  renderTimer = setTimeout(() => { renderTimer = null; $('fundamental-analysis').innerHTML = renderMarkdown(analysisText); }, 80);
 }
 function flushAnalysis() {
   if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
-  $('analysis').innerHTML = renderMarkdown(analysisText);
+  $('fundamental-analysis').innerHTML = renderMarkdown(analysisText);
 }
 
 /* ---- 初始化 ---- */
@@ -169,8 +174,6 @@ async function loadHomeHot() {
 }
 
 function retryHot() {
-  loadKnowledge();
-
   const label = $('hot-stocks-label'), back = $('hot-stocks-back');
   if (label) label.textContent = ''; if (back) back.classList.add('hidden');
   loadHomeHot();
@@ -187,7 +190,7 @@ function hotSearch(name) {
 window.addEventListener('load', () => {
   $('stock-input').focus();
   loadHomeHot();
-  loadKnowledge();
+  loadWatchlist();
 });
 
 /* ---- 板块点击 → 成分股（复用热门股票卡片） ---- */
@@ -220,8 +223,3 @@ function setHotContext(isSector, name) {
   }
 }
 
-/* ---- 讨论文章（知识库搜索）加载 ---- */
-async function loadKnowledge() {
-  const items = await apiKnowledge('股票', 10).catch(() => null);
-  if (items && items.length) renderKnowledge(items);
-}

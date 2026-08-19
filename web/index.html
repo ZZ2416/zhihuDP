@@ -45,15 +45,20 @@
             <button id="search-btn" onclick="doSearch()">查询</button>
           </div>
           <div id="suggest" class="suggest hidden"></div>
-          <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
+          <div class="hint">数据来源：东方财富 / 腾讯 · 基本面信息仅供参考</div>
         </div>
 
-        <!-- 讨论文章（知识库搜索，方形卡片） -->
-        <div class="card hot-card hidden" id="knowledge-card">
-          <div class="section-title">讨论文章</div>
-          <div class="knowledge-grid" id="knowledge"></div>
-          <div id="knowledge-note" class="k-note"></div>
+        <!-- 自选池（20 只） -->
+        <div class="card" id="watchlist-card">
+          <div class="section-title">自选池 <span id="watchlist-remain" class="fin-source"></span>
+            <a class="hot-back" style="cursor:pointer" onclick="showWatchlistHelp()">?</a></div>
+          <div class="watchlist-add-row">
+            <input id="watchlist-input" placeholder="输入代码添加，如 600519" autocomplete="off" spellcheck="false">
+            <button onclick="addWatchlist()">添加</button>
+          </div>
+          <div class="watchlist-list" id="watchlist-list"><span class="fin-loading">加载自选…</span></div>
         </div>
+
       </section>
 
       <!-- 详情视图 -->
@@ -74,24 +79,24 @@
       <div id="kline-chart"></div>
     </div>
 
-    <!-- 二期：与看山对话（K 线面板下方，独立对话区） -->
+    <!-- 基本面问答（K 线面板下方；中性助手 + 黑德文标识） -->
     <div class="card hidden" id="chat-card">
       <div class="chat-head">
-        <img class="chat-avatar" src="/pic/kanshan.jpg" alt="看山">
+        <div class="chat-avatar chat-avatar-hdw">黑</div>
         <div class="chat-title-box">
-          <div class="section-title" style="margin:0">与看山对话</div>
-          <div class="chat-sub">基于本次分析结果继续提问 · 看山是信息工具，不提供买卖建议</div>
+          <div class="section-title" style="margin:0">基本面问答 <span class="hdw-tag">黑德文</span></div>
+          <div class="chat-sub">基于本次分析结果继续提问 · 信息工具，不提供买卖建议</div>
         </div>
         <button class="chat-clear" onclick="clearChat()">清空</button>
       </div>
       <div class="chat-msgs" id="chat-msgs"></div>
       <div class="chat-input-row">
-        <input id="chat-input" placeholder="继续追问，如：情绪为什么偏空？" autocomplete="off" spellcheck="false">
+        <input id="chat-input" placeholder="继续追问，如：ROE 为什么下降？" autocomplete="off" spellcheck="false">
         <button id="chat-send" onclick="sendChat()">发送</button>
       </div>
     </div>
 
-    <!-- 财报解析：核心指标表格 + AI 解析（东财双源）——位于情绪面板上方 -->
+    <!-- 财报解析：核心指标表格 + AI 解析（东财双源） -->
     <div class="card hidden" id="finance-card">
       <div class="section-title">财务解析 <span class="fin-source">东方财富 · 最近5年年报</span></div>
       <div id="finance-table"></div>
@@ -99,14 +104,12 @@
       <div class="fin-foot">数据来源：东方财富 · 财报解读仅供参考，不构成投资建议</div>
     </div>
 
-    <div class="card">
-      <div class="section-title">情绪面板</div>
-      <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
-    </div>
-
-    <div class="card">
-      <div class="section-title">AI 分析</div>
-      <div id="analysis"></div><span id="cursor" class="blink"></span>
+    <!-- 基本面分析：四维评分 + 估值 + AI 解读（ask 的 fundamental 事件与 delta） -->
+    <div class="card hidden" id="fundamental-card">
+      <div class="section-title">基本面分析 <span class="fin-source">东方财富 / 腾讯</span>
+        <button class="wl-add-btn" onclick="addToWatchlist()">+ 自选</button></div>
+      <div id="fundamental-score" class="fund-score"><span class="fin-loading">正在评分…</span></div>
+      <div id="fundamental-analysis"><span id="cursor" class="blink"></span></div>
     </div>
 
     <div class="card hidden" id="news-card">
@@ -202,6 +205,7 @@
 <script src="/js/app.js"></script>
 <script src="/js/chat.js"></script>
 <script src="/js/finance.js"></script>
+<script src="/js/watchlist.js"></script>
 <script src="/js/video.js"></script>
 <script src="/js/keys.js"></script>
 </body>

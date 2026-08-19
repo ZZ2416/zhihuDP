@@ -501,3 +501,50 @@ footer p { margin: 3px 0; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px;
 }
 .vc-meta { font-size: 11px; color: var(--sub); margin: 0 10px 10px; }
+
+/* ===== 基本面评分卡 ===== */
+.fund-score { margin-bottom: 12px; }
+.fd-total { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.fd-t-num { font-size: 42px; font-weight: 800; line-height: 1; }
+.fd-t-grade { font-size: 15px; font-weight: 700; }
+.fd-dims { display: flex; flex-direction: column; gap: 6px; }
+.fd-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.fd-name { width: 64px; color: var(--sub); flex: none; }
+.fd-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--card-soft); overflow: hidden; }
+.fd-fill { display: block; height: 100%; border-radius: 4px; }
+.fd-val { width: 34px; text-align: right; font-weight: 700; flex: none; }
+.fd-val-line { margin-top: 10px; font-size: 12px; color: var(--sub); }
+.fd-nodata { margin-top: 8px; font-size: 11.5px; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 6px 10px; }
+.wl-add-btn { margin-left: auto; font-size: 12px; color: var(--accent); background: var(--accent-weak); border: 1px solid var(--accent); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
+.wl-add-btn:hover { background: var(--accent); color: #fff; }
+
+/* ===== 黑德文标识（黑色系） ===== */
+.chat-avatar-hdw {
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, #1a1f2e, #000);
+  color: #fff; font-weight: 800; font-size: 20px;
+  border: 2px solid #444; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+}
+.hdw-tag { font-size: 10px; color: #fff; background: #1a1f2e; border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+
+/* ===== 自选池 ===== */
+.watchlist-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.watchlist-add-row input {
+  flex: 1; padding: 8px 12px; font-size: 13px; border: 1.5px solid var(--border);
+  border-radius: 8px; outline: none; background: var(--card); color: var(--text);
+}
+.watchlist-add-row input:focus { border-color: var(--accent); }
+.watchlist-add-row button {
+  padding: 0 18px; font-size: 13px; font-weight: 600; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.watchlist-list { display: flex; flex-direction: column; }
+.wl-item { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-top: 1px solid var(--border); cursor: default; }
+.wl-item:first-child { border-top: none; }
+.wl-item.clickable { cursor: pointer; }
+.wl-item.clickable:hover { background: var(--card-soft); border-radius: 6px; }
+.wl-name { font-size: 13px; font-weight: 600; width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-score { font-size: 14px; font-weight: 800; margin-left: auto; }
+.wl-score em { font-style: normal; font-size: 11px; font-weight: 500; opacity: .75; margin-left: 4px; }
+.wl-rm { color: var(--faint); font-size: 15px; padding: 0 4px; cursor: pointer; }
+.wl-rm:hover { color: var(--err-text); }
