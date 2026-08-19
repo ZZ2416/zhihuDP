@@ -188,11 +188,14 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 				q.Price, q.Change, q.ChangePct, q.Open, q.High, q.Low, q.Volume)
 		}
 	}
-	// 前次分析快照
+	// 前次分析快照（不写回 sess，避免并发 data race；名称缺失用快照补）
 	if snap, ok := s.store.SnapshotOf(sess.Stock.Code); ok {
 		facts.PrevAnalysis = snap.Analysis
-		if sess.Stock.Name == "" {
-			sess.Stock = snap.Stock
+		if facts.StockName == "" {
+			facts.StockName = snap.Stock.Name
+		}
+		if facts.Market == "" {
+			facts.Market = snap.Stock.Market
 		}
 	}
 	// 财报指标摘要（5年年报+最新期，最小事实注入）
@@ -227,7 +230,11 @@ func formatValuation(v types.Valuation) string {
 	if v.PEEntPercent >= 0 {
 		pct = fmt.Sprintf("%.0f%%", v.PEEntPercent)
 	}
-	return fmt.Sprintf("PE(TTM) %s（历史分位 %s），PB %.2f", pe, pct, v.PB)
+	pb := "—"
+	if v.PB > 0 {
+		pb = fmt.Sprintf("%.2f", v.PB)
+	}
+	return fmt.Sprintf("PE(TTM) %s（历史分位 %s），PB %s", pe, pct, pb)
 }
 
 // formatFinance 财务指标 → 紧凑文本（报告期 | 营收 | 净利 | ROE | 毛利率 | 负债率）

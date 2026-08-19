@@ -54,9 +54,9 @@ func Get(ctx context.Context, code, market string) (*types.Valuation, error) {
 	if pb, mcap, pe, txErr := fetchTx(ctx, market, code); txErr == nil {
 		v.PB = pb
 		v.MarketCap = mcap
-		if v.PE <= 0 && pe > 0 {
+		if v.PE == 0 && pe > 0 { // 仅东财缺失时补腾讯 PE（不覆盖东财真实负值）
 			v.PE = pe
-			// 腾讯兜底无历史序列 → 分位保持 -1
+			v.Degraded = true // 口径非东财 TTM
 		}
 	} else if err != nil {
 		return nil, fmt.Errorf("估值获取失败（东财:%v 腾讯:%v）", err, txErr)
@@ -134,7 +134,14 @@ func fetchTx(ctx context.Context, market, code string) (pb, mcap, pe float64, er
 		return 0, 0, 0, err
 	}
 	// 仅取数字字段（ASCII，不受 GBK 名称影响）
-	fields := strings.Split(string(body), "~")
+	text := string(body)
+	if !strings.HasPrefix(text, "v_sh") && !strings.HasPrefix(text, "v_sz") && !strings.HasPrefix(text, "v_bj") {
+		return 0, 0, 0, fmt.Errorf("腾讯响应异常（无行情前缀）")
+	}
+	fields := strings.Split(text, "~")
+	if len(fields) < 47 {
+		return 0, 0, 0, fmt.Errorf("腾讯响应字段不足（%d）", len(fields))
+	}
 	// 已知字段：PE[39]、PB[46]、总市值[45]（亿）
 	getF := func(i int) float64 {
 		if i >= len(fields) {
@@ -161,10 +168,13 @@ func percentile(sorted []float64, cur float64) float64 {
 	return float64(cnt) / float64(n) * 100
 }
 
-// secidSuffix 东财 SECUCODE 后缀（沪=SH，深/北=SZ）
+// secidSuffix 东财 SECUCODE 后缀（沪=SH，深=SZ，北=BJ）
 func secidSuffix(market, code string) string {
 	if strings.Contains(market, "沪") || (code != "" && (code[0] == '6' || code[0] == '9')) {
 		return "SH"
+	}
+	if strings.Contains(market, "北") || (code != "" && (code[0] == '4' || code[0] == '8')) {
+		return "BJ"
 	}
 	return "SZ"
 }

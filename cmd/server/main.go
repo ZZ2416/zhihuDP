@@ -201,7 +201,7 @@ type keyService struct {
 // UpdateKeys 应用用户提交的 DeepSeek 密钥（空值保留原密钥）
 func (k *keyService) UpdateKeys(deepseekKey string) error {
 	if deepseekKey != "" {
-		k.cfg.DeepSeek.APIKey = deepseekKey
+		k.cfg.SetDeepSeekKey(deepseekKey) // 线程安全写入（agent 并发读取）
 	}
 	return nil
 }
@@ -326,8 +326,8 @@ func runKeyTool(cfg *config.Config, doKeygen, doPubkey bool, encValue, configPat
 func buildDeps(cfg *config.Config) agent.Deps {
 	return agent.Deps{
 		ResolveStock: stock.Resolve,
-		// getter：每次调用读取最新配置（支持弹窗热更新密钥后立即生效）
-		DeepSeek: func() config.DeepSeekConfig { return cfg.DeepSeek },
+		// getter：每次调用读取最新配置（线程安全，支持弹窗热更新）
+		DeepSeek: cfg.GetDeepSeek,
 	}
 }
 

@@ -1,4 +1,31 @@
 /* ui.js —— 展示层：报价卡 / 资讯 / 热门 / 基本面评分 渲染 */
+
+/* ---- 实时报价卡（fetchKline 调用） ---- */
+function renderQuote(q) {
+  const lvl = chgLevel(q.change_pct);
+  const up = (q.change || 0) >= 0;
+  const sign = up ? '+' : '';
+  const vol = (q.volume || 0) >= 10000 ? (q.volume / 10000).toFixed(2) + '万手' : (q.volume || 0) + '手';
+  $('quote-body').innerHTML =
+    '<div class="q-row">' +
+      '<div>' +
+        '<span class="q-price ' + lvl + '">' + (q.price || 0).toFixed(2) + '</span>' +
+        '<span class="q-change ' + lvl + '">' + sign + (q.change || 0).toFixed(2) + '  ' + sign + (q.change_pct || 0).toFixed(2) + '%</span>' +
+      '</div>' +
+      '<div class="q-grid">' +
+        qCell('今开', (q.open || 0).toFixed(2)) +
+        qCell('最高', (q.high || 0).toFixed(2)) +
+        qCell('最低', (q.low || 0).toFixed(2)) +
+        qCell('昨收', (q.prev_close || 0).toFixed(2)) +
+        qCell('成交量', vol) +
+      '</div>' +
+    '</div>';
+  $('quote-card').classList.remove('hidden');
+}
+function qCell(k, v) {
+  return '<div class="q-cell"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+}
+
 function renderNews(items) {
   if (!items || !items.length) return; // 无资讯不显示卡片
   let html = '<div class="news-list">';
@@ -51,90 +78,8 @@ function renderHotStocks(items) {
   for (const it of items) {
     const lvl = chgLevel(it.change_pct);
     const up = lvl !== 'down';
-    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
-      '<span class="sn">' + esc(it.name) + '</span>' +
-      '<span class="sc">' + esc(it.code) + '</span>' +
-      '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +
-      '<span class="spct ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
-      '</div>';
-  }
-  el.innerHTML = html;
-  $('hot-stocks-card').classList.remove('hidden');
-}
-
-/* ---- ticker 行情条 ---- */
-function renderTicker(items) {
-  const el = $('ticker-bar');
-  if (!items || !items.length) { el.innerHTML = ''; return; }
-  let group = '';
-  for (const it of items) {
-    const lvl = chgLevel(it.change_pct);
-    const up = lvl !== 'down';
-    const n = String(it.name || '').replace(/'/g, '');
-    group += '<span class="ticker-item" onclick="hotSearch(\'' + esc(n) + '\')">' +
-      '<span class="tn">' + esc(it.name) + '</span>' +
-      '<span class="row2">' +
-        '<span class="tp">' + (it.price || 0).toFixed(2) + '</span>' +
-        '<span class="td ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span>' +
-      '</span>' +
-      '</span>';
-  }
-  // 双份内容实现无缝滚动
-  el.innerHTML = '<div class="ticker-track">' + group + group + '</div>';
-}
-
-/* ---- 热门辅助数据：友好降级 ---- */
-const hotDegradedMap = {
-  stock: ['hot-stocks', 'hot-stocks-card'],
-  sector: ['hot-sectors', 'hot-sectors-card'],
-  sector_fall: ['hot-fall', 'hot-fall-card'],
-};
-function showHotDegraded(type) {
-  const pair = hotDegradedMap[type] || ['hot-sectors', 'hot-sectors-card'];
-  const id = pair[0], card = pair[1];
-  $('hot-stocks-label') && ($('hot-stocks-label').textContent = '');
-  $('hot-stocks-back') && $('hot-stocks-back').classList.add('hidden');
-  $(id).innerHTML = '<div class="degraded" style="margin-top:8px">热门行情数据暂时不可用，请稍后重试。' +
-    '<a style="margin-left:8px;cursor:pointer" onclick="retryHot()">重试</a></div>';
-  $(card).classList.remove('hidden');
-}
-
-/* ---- 错误 ---- */
-function showError(msg) {
-  const box = $('error-box');
-  box.classList.remove('hidden');
-  box.querySelector('.err-box').innerHTML =
-    '<strong>😥 出错了，请稍后重试。</strong>' +
-    '<div class="detail">' + esc(msg || '未知错误') + '</div>';
-}
-function hideError() { $('error-box').classList.add('hidden'); }
-
-/* ---- 板块 chip（热门板块 / 暴跌板块复用，点击查看成分股） ---- */
-function renderHotSectors(containerId, cardId, items) {
-  const el = $(containerId);
-  if (!items || !items.length) { $(cardId).classList.add('hidden'); return; }
-  let html = '';
-  for (const it of items) {
-    const lvl = chgLevel(it.change_pct);
-    const up = lvl !== 'down';
-    const n = String(it.name || '').replace(/'/g, '');
-    html += '<span class="hot-chip" onclick="hotSectorClick(\'' + esc(it.code) + '\',\'' + esc(n) + '\')" title="查看板块成分股">' +
-      '<span class="hn">' + esc(it.name) + '</span>' +
-      '<span class="hp ' + lvl + '">' + (up ? '+' : '') + (it.change_pct || 0).toFixed(2) + '%</span></span>';
-  }
-  el.innerHTML = html;
-  $(cardId).classList.remove('hidden');
-}
-
-/* ---- 热门股票（行，点击查询） ---- */
-function renderHotStocks(items) {
-  const el = $('hot-stocks');
-  if (!items || !items.length) { $('hot-stocks-card').classList.add('hidden'); return; }
-  let html = '';
-  for (const it of items) {
-    const lvl = chgLevel(it.change_pct);
-    const up = lvl !== 'down';
-    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
+    const hn = String(it.name || '').replace(/'/g, '');
+    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(hn) + '\')" title="点击查询 ' + esc(it.name) + '">' +
       '<span class="sn">' + esc(it.name) + '</span>' +
       '<span class="sc">' + esc(it.code) + '</span>' +
       '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +

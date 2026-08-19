@@ -1,8 +1,8 @@
 /* app.js —— 应用入口：视图切换 / 搜索联想 / SSE 事件分发 / 分析流式状态 */
 let analysisText = '';
 let renderTimer = null;
-let curStock = null; // 当前查看的股票（自选池「+自选」用）
 let gotFundamental = false; // 本次分析是否收到基本面评分
+let searchId = 0;            // 搜索序号（doSearch 重入保护）
 
 /* ---- 视图切换 ---- */
 function showDetail() {
@@ -52,6 +52,8 @@ async function doSearch() {
   const btn = $('search-btn');
   btn.disabled = true;
   hideSuggest();
+  if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+  const myId = ++searchId; // 本次搜索 token：后续续体校验仍是当前
 
   $('stock-head').innerHTML =
     '<span class="name">正在查询 ' + esc(stock) + '…</span>' +
@@ -72,7 +74,6 @@ async function doSearch() {
   $('video-body').innerHTML = '';
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
-  curStock = null;
   gotFundamental = false;
   $('fundamental-card').classList.add('hidden');
   $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
@@ -95,17 +96,20 @@ async function doSearch() {
     showError('网络异常：' + e.message);
   } finally {
     btn.disabled = false;
-    $('cursor').classList.add('hidden');
+    const c = $('cursor');
+    if (c) c.classList.add('hidden');
+    if (myId !== searchId) return; // 已被新搜索取代，丢弃
   }
 }
 
 /* ---- SSE 事件分发 ---- */
 function handleEvent(event, data) {
+  let myId = searchId;
   let d = {};
   try { d = data ? JSON.parse(data) : {}; } catch (e) {}
   switch (event) {
     case 'stock':
-      curStock = { code: d.code, market: d.market, name: d.name };
+      if (myId !== searchId) break;
       $('stock-head').innerHTML =
         '<span class="name">' + esc(d.name || '') + '</span>' +
         '<span class="code">' + esc(d.code || '') + '</span>' +
@@ -118,9 +122,10 @@ function handleEvent(event, data) {
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
-    case 'fundamental': gotFundamental = true; renderFundamental(d); break;
-    case 'delta': appendDelta(d.text || ''); break;
+    case 'fundamental': if (myId !== searchId) break; gotFundamental = true; renderFundamental(d); break;
+    case 'delta': if (myId !== searchId) break; appendDelta(d.text || ''); break;
     case 'done':
+      if (myId !== searchId) break;
       if (!gotFundamental) {
         $('fundamental-card').classList.remove('hidden');
         $('fundamental-score').innerHTML = '<span style="color:var(--faint)">评分暂不可用（数据源异常）</span>';
@@ -133,12 +138,14 @@ function handleEvent(event, data) {
 
 /* ---- 行情（报价 + 日K，异步） ---- */
 async function fetchKline(code, market) {
+  const myId = searchId;
   try {
     const data = await apiKline(code, market, 60);
+    if (myId !== searchId) return; // 已切股/新搜索
     if (!data || !data.quote) { renderKlineError(); return; }
     renderQuote(data.quote);
     renderKline(data.candles || [], data.quote); // quote 用于首根涨跌幅计算
-  } catch (e) { renderKlineError(); }
+  } catch (e) { if (myId === searchId) renderKlineError(); }
 }
 
 /* ---- 相关资讯（辅助，失败静默隐藏） ---- */

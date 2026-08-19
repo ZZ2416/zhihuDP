@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -51,10 +52,25 @@ type MediaConfig struct {
 
 // Config 应用配置
 type Config struct {
+	mu       sync.RWMutex   // 保护 DeepSeek 配置热更新（密钥弹窗写入 vs agent 读取）
 	DeepSeek DeepSeekConfig `yaml:"deepseek"`
 	KeyBox   KeyBoxConfig   `yaml:"keybox"`
 	Media    MediaConfig    `yaml:"media"`
 	Server   ServerConfig   `yaml:"server"`
+}
+
+// GetDeepSeek 线程安全读取 DeepSeek 配置快照
+func (c *Config) GetDeepSeek() DeepSeekConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.DeepSeek
+}
+
+// SetDeepSeekKey 线程安全更新 DeepSeek API Key（密钥弹窗热更新）
+func (c *Config) SetDeepSeekKey(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.DeepSeek.APIKey = key
 }
 
 // defaultKeyBoxDir 默认私钥目录：$HOME/.zhihudp

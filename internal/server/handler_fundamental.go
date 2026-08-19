@@ -42,7 +42,7 @@ func (s *Server) handleFundamental(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Printf("[fundamental] code=%s 失败: %v 耗时=%dms", code, err, elapsed)
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "基本面数据获取失败，请稍后重试"})
 		return
 	}
 	log.Printf("[fundamental] code=%s 总分=%d 耗时=%dms", code, res.Score.Total, elapsed)

@@ -112,7 +112,14 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 					})
 					return string(b), nil
 				}
-				return "", err
+				// 非 NotFound 错误（网络抖动等）：降级返回，避免终止整个分析
+				b, _ := json.Marshal(map[string]any{
+					"found":    false,
+					"degraded": true,
+					"err_msg":  "股票识别服务暂时不可用，请稍后重试",
+					"message":  "股票识别服务暂时不可用，请稍后重试",
+				})
+				return string(b), nil
 			}
 			_ = sink(types.Event{Type: "stock", Data: info})
 			b, _ := json.Marshal(info)
@@ -130,8 +137,8 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		}) (string, error) {
 			result, err := deps.FundamentalScore(ctx, req.Code, req.Market)
 			if err != nil {
-				// 降级：返回 JSON 错误信息，LLM 如实说明「财务数据不可用」，避免前端裸错误
-				b, _ := json.Marshal(map[string]string{"error": err.Error()})
+				// 降级：返回 JSON，LLM 如实说明「财务数据不可用」，避免前端裸错误
+				b, _ := json.Marshal(map[string]any{"degraded": true, "err_msg": "财务数据暂时不可用，请稍后重试"})
 				return string(b), nil
 			}
 			_ = sink(types.Event{Type: "fundamental", Data: result})

@@ -87,12 +87,16 @@ func compute(indicators []types.FinancialIndicator, v *types.Valuation) types.Fu
 		s.NoData = append(s.NoData, "盈利")
 	}
 
-	// 成长：营收 CAGR（按实际年数）+ 最近净利同比
-	if (base.Revenue > 0 && latest.Revenue > 0) || latest.NetProfitYoY != 0 {
+	// 成长：营收 CAGR（**年报 vs 年报**，同口径，避免中报/年报混用）+ 最近净利同比
+	latestAnnual := latestAnnualOf(indicators)
+	if (latestAnnual != nil && base.Revenue > 0 && latestAnnual.Revenue > 0) || latest.NetProfitYoY != 0 {
 		cagr := 0.0
-		if base.Revenue > 0 && latest.Revenue > 0 {
-			years := yearDiff(latest.ReportDateFull, base.ReportDateFull) // 实际年数（≥1）
-			cagr = math.Pow(latest.Revenue/base.Revenue, 1/years)*100 - 100
+		hasCagr := latestAnnual != nil && base.ReportDateFull != "" &&
+			latestAnnual.ReportDateFull != base.ReportDateFull && // 需两份不同年报
+			base.Revenue > 0 && latestAnnual.Revenue > 0
+		if hasCagr {
+			years := yearDiff(latestAnnual.ReportDateFull, base.ReportDateFull) // 实际年数（≥1）
+			cagr = math.Pow(latestAnnual.Revenue/base.Revenue, 1/years)*100 - 100
 		}
 		cg := lin(cagr, []float64{0, 5, 10, 15, 20, 30}, []float64{15, 35, 50, 65, 80, 100})
 		ny := lin(latest.NetProfitYoY, []float64{-20, -10, 0, 5, 15, 30}, []float64{10, 30, 50, 65, 80, 100})
@@ -148,6 +152,21 @@ func compute(indicators []types.FinancialIndicator, v *types.Valuation) types.Fu
 	s.Total = int(clamp(sum / totalW))
 	s.Grade = gradeOf(s.Total)
 	return s
+}
+
+// latestAnnualOf 最近一份年报（-12-31）；无则 nil
+func latestAnnualOf(indicators []types.FinancialIndicator) *types.FinancialIndicator {
+	var latest *types.FinancialIndicator
+	for i := range indicators {
+		it := &indicators[i]
+		if !strings.HasSuffix(it.ReportDateFull, "-12-31") {
+			continue
+		}
+		if latest == nil || it.ReportDateFull > latest.ReportDateFull {
+			latest = it
+		}
+	}
+	return latest
 }
 
 // yearDiff 两个报告期（YYYY-MM-DD）的年份差（≥1）

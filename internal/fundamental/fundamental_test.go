@@ -103,14 +103,15 @@ func TestScoreE2E(t *testing.T) {
 	}
 }
 
-// CAGR 用实际年数（3 年数据 → 开 3 次方，而非固定 5）
+// CAGR 用**年报 vs 年报**（同口径）：3 年翻倍 → 开 3 次方，非固定 5
 func TestCagrDynamicYears(t *testing.T) {
 	its := []types.FinancialIndicator{
 		{ReportDate: "2026中报", ReportDateFull: "2026-06-30", Revenue: 200, RevenueYoY: 20, NetProfitYoY: 20,
 			ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
-		{ReportDate: "2023年报", ReportDateFull: "2023-12-31", Revenue: 100, ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
+		{ReportDate: "2025年报", ReportDateFull: "2025-12-31", Revenue: 200, ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
+		{ReportDate: "2022年报", ReportDateFull: "2022-12-31", Revenue: 100, ROE: 20, GrossMargin: 60, NetMargin: 20, DebtRatio: 30, CashFlowToRev: 0.3},
 	}
-	// 200/100 开 3 次方 - 1 = 26%，应得到成长高分（≥70）
+	// 年报 200/100 开 3 次方 - 1 = 26%，应高成长分（≥70）
 	s := compute(its, &types.Valuation{PE: 15, PEEntPercent: 30})
 	if s.Growth < 70 {
 		t.Errorf("3年翻倍 CAGR=26%% 应高成长分，实际 %d", s.Growth)
