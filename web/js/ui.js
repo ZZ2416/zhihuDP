@@ -174,7 +174,7 @@ function renderFundamental(d) {
   const sc = d.score, v = d.valuation || {};
   const dims = [
     ['盈利能力', sc.profit], ['成长性', sc.growth],
-    ['财务健康', sc.health], ['估值', sc.valuat],
+    ['财务健康', sc.health], ['估值', sc.valuation],
   ];
   let rows = '';
   for (const [name, val] of dims) {
