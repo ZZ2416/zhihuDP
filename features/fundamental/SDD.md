@@ -1,6 +1,7 @@
 # 基本面分析（替换知乎情绪，定位 v2）— 软件设计文档（SDD）
 
-> 版本：v0.2（决策定稿）· 日期：2026-08-19 · 分支：`feature/fundamental`
+> 版本：v0.3（决策定稿）· 日期：2026-08-19 · 分支：`feature/fundamental`
+> 决策补充 v0.3：⑤ `/api/finance/analyze` **保留并存**（财务解析表格+AI 与 ask 基本面解读共存）⑥ **PE 统一东财 PE_TTM**（当前值与分位同源；腾讯仅兜底/展示 PB 市值）⑦ 原「AI 分析」卡**合并进基本面卡** ⑧ 自选池**两种添加**（详情页按钮 + 卡片内输入）
 > 决策补充：① AI 解读**合并进 ask**（去掉独立 /api/fundamental/analyze）② 人设改为中性助手 + **「黑德文」**黑色系标识（非拟人）③ 估值分位用 **PE(TTM) 分位**（PB 仅展示）
 > 依据：`business-design.md`（定位 v2）、`features/fundamental/设计方案.md`（v0.2）
 > 本期范围：删知乎 → 四维评分（各自卡片）→ 估值历史分位 → 自选池 20 只；**产业链不做**
@@ -131,9 +132,10 @@ server -> watchlistStore: 追加 + 写文件
 ## 7. 详细设计
 
 ### 7.1 valuation dao（internal/valuation/valuation.go）
-- **腾讯当前估值**：`qt.gtimg.cn/q=sh600519`（GBK 解码，`~` 分割）→ `[39]`PE、`[46]`PB、`[45]`总市值（亿）
-- **东财历史分位**：`RPT_VALUEANALYSIS_DET`，`filter=(SECUCODE="600519.SH")`，`sortColumns=TRADE_DATE` 取最近 **419** 条 PE_TTM → 当前 PE 百分位（`(count(≤cur)/n)*100`）；失败 → 分位 -1 + Degraded
-- 串行取（东财并发易触发风控，finance 同经验）；`Timeout 6s`；浏览器 UA
+- **当前 PE 与分位序列同源（统一东财）**：`RPT_VALUEANALYSIS_DET`，`filter=(SECUCODE="600519.SH")`，`sortColumns=TRADE_DATE` 取最近 **419** 条 PE_TTM → 当前 PE = 最新一条；百分位 = `(count(≤cur)/n)*100`
+- **腾讯 qt 估值（兜底/补充）**：`qt.gtimg.cn/q=sh600519`（GBK 解码，`~` 分割）→ `[39]`PE、`[46]`PB、`[45]`总市值（亿）；东财 PE 失败时用腾讯 PE（分位 -1 标注）
+- PE≤0（亏损）→ 估值维「不适用」低分（10）+ 标注
+- 串行取（东财并发易触发风控）；`Timeout 6s`；浏览器 UA
 
 ### 7.2 fundamental service（internal/fundamental/fundamental.go）
 - `Score(ctx, code, market) (*types.FundamentalResult, error)`：调 finance.GetResult + valuation.Get → 评分模型
@@ -154,9 +156,9 @@ server -> watchlistStore: 追加 + 写文件
 - 列表展示：服务端返回条目，前端逐只调 `/api/fundamental` 聚合评分（或列表接口批量，MVP 前端循环，P1 再优化）
 
 ### 7.6 前端
-- 详情页：删「情绪面板」「讨论文章」卡片；「财务解析」保留（表格）
-- 新增「**基本面分析**」卡片（情绪面板原位置）：四维评分条（各带分数）+ 总分大数字 + 定性标签 + 估值行（PE/PB/分位）+ AI 解读（ask 的 delta 渲染到此处，或 fundamental/analyze）
-- 主栏目：新增「**自选池**」卡片（添加/删除，列表展示评分+价格+涨跌，点击进详情）
+- 详情页：删「情绪面板」「讨论文章」卡片；「财务解析」保留（表格 + AI 解析，`/api/finance/analyze` 保留并存）
+- **删除原「AI 分析」卡**，新增「**基本面分析**」卡（情绪面板原位置）：四维评分条（各带分数）+ 总分大数字 + 定性标签 + 估值行（PE/PB/分位）+ AI 解读（**ask 的 delta 渲染于此**）
+- 主栏目：新增「**自选池**」卡片——**两种添加**（详情页「加入自选」按钮 + 卡片内输入代码），列表展示评分+价格+涨跌，点击进详情
 
 ## 8. 知乎移除清单
 
