@@ -16,37 +16,7 @@ type StockInfo struct {
 	Market string `json:"market"` // 如 沪A / 深A / 北A
 }
 
-// Ratio 多空占比（0-1 比例）
-type Ratio struct {
-	Bull    float64 `json:"bull"`
-	Bear    float64 `json:"bear"`
-	Neutral float64 `json:"neutral"`
-}
-
-// ViewItem 代表观点
-type ViewItem struct {
-	Title     string `json:"title"`
-	Url       string `json:"url"`
-	Author    string `json:"author"`
-	VoteUp    int    `json:"vote_up"`
-	Excerpt   string `json:"excerpt"`
-	Sentiment string `json:"sentiment"` // bull/bear/neutral
-}
-
-// SentimentResult 情绪面板结构化数据（SSE sentiment 事件负载）
-type SentimentResult struct {
-	Code     string     `json:"code"`
-	Name     string     `json:"name"`
-	Heat     int        `json:"heat"`   // 讨论量（demo：本次取回条数）
-	Sample   int        `json:"sample"` // 实际分类样本数
-	Ratio    Ratio      `json:"ratio"`
-	Score    *int       `json:"score"`    // 参考强度 1-10；样本不足为 nil
-	Items    []ViewItem `json:"items"`    // 代表观点 ≤5
-	Degraded bool       `json:"degraded"` // true=降级（样本不足/搜索失败）
-	ErrMsg   string     `json:"err_msg,omitempty"`
-}
-
-// Event 对外事件（SSE 事件协议：stock / sentiment / delta / done / error）
+// Event 对外事件（SSE 事件协议：stock / delta / done / error）
 type Event struct {
 	Type string
 	Data any
@@ -99,13 +69,6 @@ type HotItem struct {
 	Type      string  `json:"type"`       // stock / sector
 }
 
-// KnowledgeItem 知识库搜索结果条目（GET /api/knowledge 返回体元素）
-type KnowledgeItem struct {
-	Content   []string `json:"content"`    // 命中的内容片段
-	DocName   string   `json:"doc_name"`   // 文档名（讨论标题）
-	OriginUrl string   `json:"origin_url"` // 知乎原文链接
-}
-
 // ChatMessage 追问对话消息（会话历史）
 type ChatMessage struct {
 	Role    string `json:"role"` // user / assistant
@@ -118,10 +81,10 @@ type ChatFacts struct {
 	StockCode    string
 	Market       string // 市场（沪A/深A）
 	Quote        string // 行情快照文本（报价级）
-	Sentiment    string // 情绪面板摘要文本
 	Finance      string // 财务指标摘要（最近5年年报+最新期）
-	Knowledge    string // 知识库检索片段
-	PrevAnalysis string // 一期 AI 分析文本（中性文案）
+	Valuation    string // 估值摘要（PE/PB/分位，功能点7注入）
+	Score        string // 四维评分摘要（功能点7注入）
+	PrevAnalysis string // 一期 AI 分析文本
 }
 
 // FinancialIndicator 单报告期财务指标（数值已归一化为亿元 / %）

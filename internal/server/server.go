@@ -77,11 +77,6 @@ type NewsProvider interface {
 	GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error)
 }
 
-// KnowledgeProvider 知识库搜索接口（由 *zhihu.Client.KnowledgeSearch 实现）
-type KnowledgeProvider interface {
-	KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error)
-}
-
 // HotProvider 热门榜服务接口（由 internal/hot 实现）
 type HotProvider interface {
 	GetHot(ctx context.Context, typ string, count int) ([]types.HotItem, error)
@@ -122,8 +117,8 @@ type FinanceProvider interface {
 type ChatProvider interface {
 	// Chat 处理一次追问：SSE 事件经 sink 转发（delta → done）
 	Chat(ctx context.Context, code, market, message string, sink func(types.Event) error) error
-	// SetSnapshot 一期 /api/ask 结束后写入结果快照（情绪 + 分析文本），供对话上下文使用
-	SetSnapshot(code string, stock types.StockInfo, sentiment *types.SentimentResult, analysis string)
+	// SetSnapshot 一期 /api/ask 结束后写入结果快照（分析文本），供对话上下文使用
+	SetSnapshot(code string, stock types.StockInfo, analysis string)
 	// Reset 清空某股票的对话会话（前端「清空」按钮）
 	Reset(code string)
 }
@@ -135,7 +130,6 @@ type Server struct {
 	klineProvider KlineProvider
 	newsProvider  NewsProvider
 	hotProvider   HotProvider
-	knowledge     KnowledgeProvider
 	keyService    KeyService
 	chatProvider  ChatProvider
 	finance       FinanceProvider
@@ -148,14 +142,13 @@ type Server struct {
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
 		klineProvider: klineProvider,
 		newsProvider:  newsProvider,
 		hotProvider:   hotProvider,
-		knowledge:     knowledge,
 		keyService:    keyService,
 		chatProvider:  chatProvider,
 		finance:       finance,
@@ -175,7 +168,6 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/kline", s.handleKline)                     // 行情：报价 + 日K线
 	mux.HandleFunc("GET /api/news", s.handleNews)                       // 资讯：相关新闻（辅助）
 	mux.HandleFunc("GET /api/hot", s.handleHot)                         // 热门：股票/板块榜
-	mux.HandleFunc("GET /api/knowledge", s.handleKnowledge)             // 知识库搜索：股票讨论
 	mux.HandleFunc("GET /api/config/pubkey", s.handlePubKey)            // 密钥箱：下发 RSA 公钥
 	mux.HandleFunc("POST /api/config/keys", s.handleUpdateKeys)         // 密钥箱：接收加密提交的用户密钥
 	mux.HandleFunc("POST /api/ask", s.handleAsk)                        // SSE：完整分析

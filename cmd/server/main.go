@@ -22,12 +22,10 @@ import (
 	"zhihudp/internal/kline"
 	"zhihudp/internal/minute"
 	"zhihudp/internal/news"
-	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
 	"zhihudp/internal/video"
-	"zhihudp/internal/zhihu"
 	"zhihudp/web"
 )
 
@@ -68,9 +66,8 @@ func main() {
 	}
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
-	zhClient := zhihu.New(cfg.Zhihu)
-	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient, configPath: *configPath}
-	deps := buildDeps(cfg, zhClient)
+	ks := &keyService{KeyBox: kb, cfg: cfg, configPath: *configPath}
+	deps := buildDeps(cfg)
 
 	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
 	chatSvc := chat.New(chat.NewStore(10), chat.Deps{
@@ -80,9 +77,6 @@ func main() {
 				return nil, err
 			}
 			return &k.Quote, nil
-		},
-		Knowledge: func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error) {
-			return zhClient.KnowledgeSearch(ctx, query, []string{"7520243014858214186"}, limit)
 		},
 		Finance: func(ctx context.Context, code, market string) (*types.FinanceResult, error) {
 			return finance.GetResult(ctx, code, market)
@@ -119,9 +113,6 @@ func main() {
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
 		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
-		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
-			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
-		}),
 		ks,              // 密钥箱：公钥下发 + 加密密钥热更新
 		chatSvc,         // 二期：看山追问对话
 		fp,              // 财报解析（东财双源 + AI）
@@ -154,12 +145,11 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 
 // 编译期断言：适配器满足 server 接口（house style）
 var (
-	_ server.Analyzer          = (analyzerFunc)(nil)
-	_ server.Resolver          = (resolverFunc)(nil)
-	_ server.KlineProvider     = (klineProviderFunc)(nil)
-	_ server.NewsProvider      = (newsProviderFunc)(nil)
-	_ server.HotProvider       = hotProviderFunc{}
-	_ server.KnowledgeProvider = (knowledgeProviderFunc)(nil)
+	_ server.Analyzer      = (analyzerFunc)(nil)
+	_ server.Resolver      = (resolverFunc)(nil)
+	_ server.KlineProvider = (klineProviderFunc)(nil)
+	_ server.NewsProvider  = (newsProviderFunc)(nil)
+	_ server.HotProvider   = hotProviderFunc{}
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -174,13 +164,6 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
-}
-
-// knowledgeProviderFunc 适配器：函数实现 → server.KnowledgeProvider 接口
-type knowledgeProviderFunc func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error)
-
-func (f knowledgeProviderFunc) KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
-	return f(ctx, query, kbIDs, limit)
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口
@@ -201,7 +184,6 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 type keyService struct {
 	*keybox.KeyBox
 	cfg        *config.Config
-	zhClient   *zhihu.Client
 	configPath string // config.yaml 路径（上传密钥后持久化密文用）
 }
 
@@ -211,8 +193,7 @@ func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
 		k.cfg.DeepSeek.APIKey = deepseekKey
 	}
 	if zhihuSecret != "" {
-		k.cfg.Zhihu.AccessSecret = zhihuSecret
-		k.zhClient.UpdateKeys(zhihuSecret)
+		// 知乎密钥已随知乎数据源移除；此处仅保留 DeepSeek 密钥热更新
 	}
 	return nil
 }
@@ -276,13 +257,6 @@ func decryptEncKeys(cfg *config.Config, kb *keybox.KeyBox) error {
 		}
 		cfg.DeepSeek.APIKey = string(plain)
 	}
-	if cfg.Zhihu.AccessSecretEnc != "" {
-		plain, err := kb.DecryptOAEPBase64(cfg.Zhihu.AccessSecretEnc)
-		if err != nil {
-			return fmt.Errorf("解密 zhihu.access_secret_enc 失败: %w", err)
-		}
-		cfg.Zhihu.AccessSecret = string(plain)
-	}
 	return nil
 }
 
@@ -329,12 +303,9 @@ func runKeyTool(cfg *config.Config, doKeygen, doPubkey bool, encValue, configPat
 }
 
 // buildDeps 组装 agent 依赖（业务层接线点）
-func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
+func buildDeps(cfg *config.Config) agent.Deps {
 	return agent.Deps{
 		ResolveStock: stock.Resolve,
-		AnalyzeSentiment: func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
-			return sentiment.Analyze(ctx, code, name, zhClient, cfg.DeepSeek)
-		},
 		// getter：每次调用读取最新配置（支持弹窗热更新密钥后立即生效）
 		DeepSeek: func() config.DeepSeekConfig { return cfg.DeepSeek },
 	}
@@ -342,7 +313,7 @@ func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
 
 // runCLI 命令行模式：跑一次分析，打印事件
 func runCLI(query string, cfg *config.Config) {
-	deps := buildDeps(cfg, zhihu.New(cfg.Zhihu))
+	deps := buildDeps(cfg)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {

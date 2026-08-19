@@ -14,11 +14,11 @@ func TestPercentile(t *testing.T) {
 		cur    float64
 		want   float64
 	}{
-		{[]float64{10, 20, 30, 40, 50}, 15, 20},   // 低于 2/5 个
-		{[]float64{10, 20, 30, 40, 50}, 50, 100},  // 最高 → 100
-		{[]float64{10, 20, 30, 40, 50}, 10, 20},   // 最低 → 1/5
-		{[]float64{10, 20, 30}, 25, 66.6666666},   // 中间
-		{[]float64{}, 10, -1},                      // 空序列
+		{[]float64{10, 20, 30, 40, 50}, 15, 20},  // 低于 2/5 个
+		{[]float64{10, 20, 30, 40, 50}, 50, 100}, // 最高 → 100
+		{[]float64{10, 20, 30, 40, 50}, 10, 20},  // 最低 → 1/5
+		{[]float64{10, 20, 30}, 25, 66.6666666},  // 中间
+		{[]float64{}, 10, -1},                    // 空序列
 	}
 	for _, c := range cases {
 		got := percentile(c.series, c.cur)
@@ -50,12 +50,12 @@ func TestFetchTx(t *testing.T) {
 		for len(f) < 39 {
 			f = append(f, "0")
 		}
-		f = append(f, "19.90")           // [39] PE
+		f = append(f, "19.90") // [39] PE
 		for len(f) < 45 {
 			f = append(f, "0")
 		}
-		f = append(f, "16203.56")        // [45] 总市值
-		f = append(f, "6.45")            // [46] PB
+		f = append(f, "16203.56") // [45] 总市值
+		f = append(f, "6.45")     // [46] PB
 		for len(f) < 60 {
 			f = append(f, "0")
 		}

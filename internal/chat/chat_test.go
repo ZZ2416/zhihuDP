@@ -55,16 +55,10 @@ func fakeDeps(t *testing.T) Deps {
 		Quote: func(_ context.Context, _, _ string) (*types.Quote, error) {
 			return &types.Quote{Price: 100, Change: 1.5, ChangePct: 1.52, Open: 99, High: 101, Low: 98, Volume: 12345}, nil
 		},
-		Knowledge: func(_ context.Context, _ string, _ int) ([]types.KnowledgeItem, error) {
-			return []types.KnowledgeItem{{DocName: "如何做好仓位管理", Content: []string{"这是一段方法论内容。"}}}, nil
-		},
 		ChatAgent: func(_ context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error {
 			// 校验事实组装与历史
 			if !strings.Contains(facts.Quote, "现价 100.00") {
 				t.Errorf("行情快照缺失: %q", facts.Quote)
-			}
-			if !strings.Contains(facts.Sentiment, "看多 80%") {
-				t.Errorf("情绪摘要缺失: %q", facts.Sentiment)
 			}
 			if !strings.Contains(facts.PrevAnalysis, "一期分析") {
 				t.Errorf("前次分析缺失: %q", facts.PrevAnalysis)
@@ -81,9 +75,8 @@ func TestChatFlow(t *testing.T) {
 	store := NewStore(10)
 	svc := New(store, fakeDeps(t))
 	store.SetSnapshot("600519", Snapshot{
-		Stock:     types.StockInfo{Code: "600519", Name: "贵州茅台", Market: "沪A"},
-		Sentiment: &types.SentimentResult{Heat: 10, Sample: 10, Ratio: types.Ratio{Bull: 0.8, Bear: 0.1, Neutral: 0.1}},
-		Analysis:  "一期分析：情绪偏多。",
+		Stock:    types.StockInfo{Code: "600519", Name: "贵州茅台", Market: "沪A"},
+		Analysis: "一期分析：基本面解读。",
 	})
 	// 先有一次历史
 	store.Append("600519", "user", "之前的问题")

@@ -39,10 +39,9 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 捕获一期分析快照（二期对话上下文用）：stock 事件拿 code、sentiment 事件拿情绪结果、delta 累积分析文本
+	// 捕获一期分析快照（对话上下文用）：stock 事件拿 code、delta 累积分析文本
 	var (
 		curStock     types.StockInfo
-		curSentiment *types.SentimentResult
 		analysisText strings.Builder
 	)
 	sink := func(ev types.Event) error {
@@ -50,10 +49,6 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		case "stock":
 			if info, ok := ev.Data.(*types.StockInfo); ok {
 				curStock = *info
-			}
-		case "sentiment":
-			if s, ok := ev.Data.(*types.SentimentResult); ok {
-				curSentiment = s
 			}
 		case "delta":
 			if m, ok := ev.Data.(map[string]string); ok {
@@ -80,8 +75,8 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	_ = writeSSE(w, "done", struct{}{})
 	flusher.Flush()
 
-	// 二期：保存分析快照（情绪 + 最终分析文本），供「与看山对话」使用
+	// 保存分析快照（最终分析文本），供基本面问答使用
 	if s.chatProvider != nil && curStock.Code != "" {
-		s.chatProvider.SetSnapshot(curStock.Code, curStock, curSentiment, analysisText.String())
+		s.chatProvider.SetSnapshot(curStock.Code, curStock, analysisText.String())
 	}
 }

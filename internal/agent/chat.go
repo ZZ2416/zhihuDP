@@ -93,14 +93,14 @@ func formatFacts(f types.ChatFacts) string {
 	if f.Quote != "" {
 		b.WriteString("行情快照：" + f.Quote + "\n")
 	}
-	if f.Sentiment != "" {
-		b.WriteString("知乎情绪：" + f.Sentiment + "\n")
-	}
 	if f.Finance != "" {
 		b.WriteString("财务指标：\n" + f.Finance)
 	}
-	if f.Knowledge != "" {
-		b.WriteString("知识库片段：\n" + f.Knowledge)
+	if f.Valuation != "" {
+		b.WriteString("估值：" + f.Valuation + "\n")
+	}
+	if f.Score != "" {
+		b.WriteString("基本面评分：" + f.Score + "\n")
 	}
 	if f.PrevAnalysis != "" {
 		b.WriteString("\n此前 AI 分析（引用其结论时保持一致）：\n" + f.PrevAnalysis)

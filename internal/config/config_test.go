@@ -9,7 +9,7 @@ import (
 func TestPersistEncOnlyWritesEncFields(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	orig := "zhihu:\n  access_secret: \"plain-secret\"\n  openapi_base_url: \"https://developer.zhihu.com\"\ndeepseek:\n  api_key: \"sk-plain\"\nserver:\n  port: 8080\n"
+	orig := "deepseek:\n  api_key: \"sk-plain\"\nserver:\n  port: 8080\n"
 	if err := os.WriteFile(path, []byte(orig), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -25,15 +25,15 @@ func TestPersistEncOnlyWritesEncFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg2.DeepSeek.APIKey != "sk-plain" || cfg2.Zhihu.AccessSecret != "plain-secret" {
+	if cfg2.DeepSeek.APIKey != "sk-plain" {
 		t.Errorf("明文被覆盖: %+v", cfg2)
 	}
-	if cfg2.DeepSeek.APIKeyEnc != "ENC_DS" || cfg2.Zhihu.AccessSecretEnc != "ENC_ZH" {
-		t.Errorf("enc 字段未写入: deepseek=%q zhihu=%q", cfg2.DeepSeek.APIKeyEnc, cfg2.Zhihu.AccessSecretEnc)
+	if cfg2.DeepSeek.APIKeyEnc != "ENC_DS" {
+		t.Errorf("enc 字段未写入: deepseek=%q", cfg2.DeepSeek.APIKeyEnc)
 	}
 	// 文件中不应出现明文密钥（检查写入内容不含明文？明文本来就有，只验证 enc 存在即可）
 	data, _ := os.ReadFile(path)
-	if !contains(string(data), "api_key_enc: ENC_DS") || !contains(string(data), "access_secret_enc: ENC_ZH") {
+	if !contains(string(data), "api_key_enc: ENC_DS") {
 		t.Errorf("写回文件缺少 enc 字段:\n%s", data)
 	}
 }

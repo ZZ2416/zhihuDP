@@ -67,7 +67,7 @@ func (fakeChatProvider) Chat(_ context.Context, _, _, _ string, sink func(types.
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "看山觉得…"}})
 }
 
-func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ *types.SentimentResult, _ string) {
+func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ string) {
 }
 
 func (fakeChatProvider) Reset(_ string) {}
@@ -107,7 +107,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -202,26 +202,6 @@ func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.Hot
 
 func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
 	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
-}
-
-type fakeKnowledgeProvider struct{}
-
-func (fakeKnowledgeProvider) KnowledgeSearch(_ context.Context, _ string, _ []string, _ int) ([]types.KnowledgeItem, error) {
-	return []types.KnowledgeItem{{DocName: "测试讨论", OriginUrl: "https://www.zhihu.com/", Content: []string{"股票讨论内容"}}}, nil
-}
-
-func TestFilterInvalidLinks(t *testing.T) {
-	items := []types.KnowledgeItem{
-		{DocName: "有链接", OriginUrl: "https://zhuanlan.zhihu.com/p/1993980027537229643"},
-		{DocName: "空链接", OriginUrl: ""},
-		{DocName: "非http", OriginUrl: "javascript:alert(1)"},
-		{DocName: "无host", OriginUrl: "https://"},
-		{DocName: "非法url", OriginUrl: "ht tp://x"},
-	}
-	got := filterInvalidLinks(items)
-	if len(got) != 1 || got[0].DocName != "有链接" {
-		t.Fatalf("期望仅保留合法链接条目，实际 %d 条: %+v", len(got), got)
-	}
 }
 
 func TestQuotaStore(t *testing.T) {

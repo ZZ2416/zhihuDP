@@ -23,7 +23,7 @@ import (
 const browserUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
 var (
-	navURL   = "https://api.bilibili.com/x/web-interface/nav"         // 获取 wbi 密钥
+	navURL    = "https://api.bilibili.com/x/web-interface/nav"             // 获取 wbi 密钥
 	searchURL = "https://api.bilibili.com/x/web-interface/wbi/search/type" // 搜索
 	// mixinKeyEncTab wbi 混合密钥重排表（B站公开算法）
 	mixinKeyEncTab = []int{46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52}
@@ -70,14 +70,14 @@ func GetVideos(ctx context.Context, keyword string, count int) ([]types.VideoIte
 		Message string `json:"message"`
 		Data    struct {
 			Result []struct {
-				Title        string `json:"title"`
-				Bvid         string `json:"bvid"`
-				Pic          string `json:"pic"`
-				Play         int64  `json:"play"`
-				VideoReview  int64  `json:"video_review"`
-				Duration     string `json:"duration"` // 秒（字符串）
-				Pubdate      int64  `json:"pubdate"`  // 时间戳
-				Author       string `json:"author"`
+				Title       string `json:"title"`
+				Bvid        string `json:"bvid"`
+				Pic         string `json:"pic"`
+				Play        int64  `json:"play"`
+				VideoReview int64  `json:"video_review"`
+				Duration    string `json:"duration"` // 秒（字符串）
+				Pubdate     int64  `json:"pubdate"`  // 时间戳
+				Author      string `json:"author"`
 			} `json:"result"`
 		} `json:"data"`
 	}

@@ -23,8 +23,7 @@ import (
 
 // Deps agent 依赖（由 cmd/server 组装注入，避免全局状态）
 type Deps struct {
-	ResolveStock     func(ctx context.Context, query string) (*types.StockInfo, error)
-	AnalyzeSentiment func(ctx context.Context, code, name string) (*types.SentimentResult, error)
+	ResolveStock func(ctx context.Context, query string) (*types.StockInfo, error)
 	// DeepSeek 配置 getter：每次调用取最新（支持密钥热更新）
 	DeepSeek func() config.DeepSeekConfig
 }
@@ -122,41 +121,20 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		return nil, fmt.Errorf("构建 resolve_stock 工具失败: %w", err)
 	}
 
-	sentimentTool, err := utils.InferTool("analyze_sentiment",
-		"分析股票在知乎的讨论情绪，返回热度、多空占比、参考强度分、代表观点。",
-		func(ctx context.Context, req *struct {
-			Code string `json:"code" jsonschema_description:"股票代码，如 600519"`
-			Name string `json:"name" jsonschema_description:"股票名称，如 贵州茅台"`
-		}) (string, error) {
-			result, err := deps.AnalyzeSentiment(ctx, req.Code, req.Name)
-			if err != nil {
-				return "", err
-			}
-			_ = sink(types.Event{Type: "sentiment", Data: result})
-			b, _ := json.Marshal(result)
-			return string(b), nil
-		})
-	if err != nil {
-		return nil, fmt.Errorf("构建 analyze_sentiment 工具失败: %w", err)
-	}
-
 	cm, err := newDeepSeekModel(ctx, deps.DeepSeek())
 	if err != nil {
 		return nil, fmt.Errorf("构建 DeepSeek 模型失败: %w", err)
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: "zhihu-stock-sentiment-agent",
-		Instruction: `你是知乎股票情绪分析助手。流程固定：
-1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具；
-2) 再调用 analyze_sentiment 获取情绪数据；
-3) 基于返回的 JSON 撰写分析面板，分三段：情绪面总结、值得关注的讨论点、风险提示。
-若返回 degraded=true 或 err_msg 非空，如实说明数据不足或无法检索，不要编造。
-严格约束：不得出现买入/卖出/持有/建议/概率/预测/推荐/荐股等投资建议措辞；不得编造返回 JSON 中不存在的观点；文末可列出来源（标题+链接）。`,
+		Name: "stock-analysis-agent",
+		Instruction: `你是股票基本面分析助手。流程固定：
+1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具。
+严格约束：不推荐买卖、不评股价、不给目标价，不用「概率/胜率/预测」措辞；不编造数据。`,
 		Model: cm,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
-				Tools: []tool.BaseTool{resolveTool, sentimentTool},
+				Tools: []tool.BaseTool{resolveTool},
 			},
 		},
 		MaxIterations: 5,
