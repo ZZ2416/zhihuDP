@@ -172,12 +172,38 @@ function renderKlineError() {
 /* ===== 分时图（日K/分时 切换，懒加载） ===== */
 let minuteCache = null; // {code, market, data}
 
+let minuteTimer = null; // 分时轮询定时器
+
+/* 分时实时刷新：分时 tab 激活时每 30s 拉一次最新数据重绘（保留交互） */
+const MINUTE_REFRESH_MS = 30000;
+function startMinuteRefresh() {
+  stopMinuteRefresh();
+  minuteTimer = setInterval(() => {
+    if (document.hidden) return;            // 页面隐藏时暂停
+    if (!$('tab-minute') || !$('tab-minute').classList.contains('active')) return; // 不在分时 tab
+    if (!minuteCache) return;
+    refreshMinute();
+  }, MINUTE_REFRESH_MS);
+}
+function stopMinuteRefresh() {
+  if (minuteTimer) { clearInterval(minuteTimer); minuteTimer = null; }
+}
+async function refreshMinute() {
+  try {
+    const data = await apiMinute(minuteCache.code, minuteCache.market);
+    if (!data || !data.points || !data.points.length) return;
+    minuteCache.data = data;
+    if ($('tab-minute') && $('tab-minute').classList.contains('active')) renderMinute(data);
+  } catch (e) { /* 静默，下轮重试 */ }
+}
+
 /* 切换日K/分时 */
 async function switchKline(mode) {
   const dayBtn = $('tab-day'), minBtn = $('tab-minute');
   if (mode === 'minute') {
     dayBtn.classList.remove('active');
     minBtn.classList.add('active');
+    startMinuteRefresh();
     if (!minuteCache) {
       const code = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
       const market = $('stock-head') ? ($('stock-head').querySelector('.market') || {}).textContent : '';
@@ -197,6 +223,7 @@ async function switchKline(mode) {
   } else {
     minBtn.classList.remove('active');
     dayBtn.classList.add('active');
+    stopMinuteRefresh(); // 切回日K 停止分时轮询
     if (window.__lastKlineData) { // 用缓存数据重新渲染（恢复交互绑定）
       renderKline(window.__lastKlineData.candles, window.__lastKlineData.quote);
     }

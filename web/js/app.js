@@ -51,12 +51,15 @@ async function doSearch() {
   btn.disabled = true;
   hideSuggest();
 
-  $('stock-head').innerHTML = '';
+  $('stock-head').innerHTML =
+    '<span class="name">正在查询 ' + esc(stock) + '…</span>' +
+    '<span class="fresh" style="color:var(--faint)">识别中</span>';
   $('quote-card').classList.add('hidden');
   $('quote-body').innerHTML = '';
   $('kline-chart').innerHTML = '';
   minuteCache = null; // 分时缓存重置（新股票重新加载）
   window.__lastKlineData = null;
+  stopMinuteRefresh(); // 停止分时轮询
   if ($('tab-day')) { $('tab-day').classList.add('active'); $('tab-minute').classList.remove('active'); }
   $('news-card').classList.add('hidden');
   $('news-body').innerHTML = '';
