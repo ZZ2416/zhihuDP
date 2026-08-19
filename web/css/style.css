@@ -443,3 +443,12 @@ footer p { margin: 3px 0; }
 .fin-ai { font-size: 14px; line-height: 1.8; color: var(--text); }
 .fin-ai p { margin: 0 0 8px; }
 .fin-ai ul, .fin-ai ol { margin: 4px 0 8px; padding-left: 20px; }
+
+/* ===== K线/分时切换 ===== */
+.kline-tabs { display: flex; gap: 8px; margin: 10px 0 6px; }
+.kline-tab {
+  font-size: 12px; padding: 4px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--card); color: var(--sub); transition: all .2s;
+}
+.kline-tab:hover { color: var(--text); border-color: var(--accent); }
+.kline-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }

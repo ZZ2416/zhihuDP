@@ -82,6 +82,7 @@ function renderKline(candles, quote) {
   svg += '<rect id="k-hl" fill="var(--accent-weak)" opacity="0.55" visibility="hidden"/>';
 
   el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;touch-action:none">' + svg + '</svg>';
+  window.__lastKline = el.innerHTML; // 缓存日K SVG（切回时重画）
 
   // 明细浮层（HTML 覆盖层）
   let tip = el.querySelector('.kline-tip');
@@ -166,4 +167,103 @@ function renderKlineError() {
   const el = $('kline-chart');
   el.innerHTML = '<div class="degraded" style="margin-top:12px">行情数据加载失败，请稍后重试</div>';
   el._k = null;
+}
+
+/* ===== 分时图（日K/分时 切换，懒加载） ===== */
+let minuteCache = null; // {code, market, data}
+
+/* 切换日K/分时 */
+async function switchKline(mode) {
+  const dayBtn = $('tab-day'), minBtn = $('tab-minute');
+  if (mode === 'minute') {
+    dayBtn.classList.remove('active');
+    minBtn.classList.add('active');
+    if (!minuteCache) {
+      const code = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
+      const market = $('stock-head') ? ($('stock-head').querySelector('.market') || {}).textContent : '';
+      if (!code) return;
+      $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">加载分时数据…</div>';
+      try {
+        const data = await apiMinute(code, market);
+        if (!data || !data.points || !data.points.length) { $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">暂无分时数据</div>'; return; }
+        minuteCache = { code, market, data };
+        renderMinute(data);
+      } catch (e) {
+        $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">分时加载失败，请稍后重试</div>';
+      }
+    } else {
+      renderMinute(minuteCache.data);
+    }
+  } else {
+    minBtn.classList.remove('active');
+    dayBtn.classList.add('active');
+    if (window.__lastKline) { // 重画最近一次日K（缓存数据）
+      $('kline-chart').innerHTML = window.__lastKline;
+    }
+  }
+}
+
+/* 分时 SVG：价格线 + 均价线 + 昨收虚线（涨红跌绿） */
+function renderMinute(data) {
+  const pts = data.points;
+  const n = pts.length;
+  const W = 860, H = 340, padL = 58, padR = 12, padT = 18;
+  const plotW = W - padL - padR;
+  const pre = data.pre_close || pts[0].price;
+  const cw = plotW / n;
+  const x = i => padL + i * cw + cw / 2;
+
+  let min = Infinity, max = -Infinity;
+  for (const p of pts) {
+    if (p.price < min) min = p.price;
+    if (p.price > max) max = p.price;
+    if (p.avg_price > 0 && p.avg_price < min) min = p.avg_price;
+    if (p.avg_price > 0 && p.avg_price > max) max = p.avg_price;
+  }
+  if (pre < min) min = pre;
+  if (pre > max) max = pre;
+  const pad = (max - min) * 0.08 || 1;
+  min -= pad; max += pad;
+  const y = v => padT + (max - v) / (max - min) * (H - 40 - padT);
+
+  const line = (get, color, w) => {
+    const pts2 = [];
+    for (let i = 0; i < n; i++) {
+      const v = get(pts[i]);
+      if (v > 0) pts2.push(x(i).toFixed(1) + ',' + y(v).toFixed(1));
+    }
+    return '<polyline points="' + pts2.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="' + (w || 1.5) + '"/>';
+  };
+  const up = pts[n - 1].price >= pre;
+  const priceColor = up ? 'var(--bull)' : 'var(--bear)';
+
+  let svg = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block">';
+  // 网格 + 刻度
+  const gl = 4;
+  for (let i = 0; i <= gl; i++) {
+    const v = min + (max - min) * i / gl, yy = y(v);
+    svg += '<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--border)" stroke-width="1"/>';
+    svg += '<text x="' + (padL - 6) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10" fill="var(--faint)">' + v.toFixed(2) + '</text>';
+  }
+  // 昨收虚线
+  const py = y(pre);
+  svg += '<line x1="' + padL + '" y1="' + py + '" x2="' + (W - padR) + '" y2="' + py + '" stroke="var(--neutral)" stroke-width="1" stroke-dasharray="4,3"/>';
+  svg += '<text x="' + (padL + 4) + '" y="' + (py - 4) + '" font-size="10" fill="var(--neutral)">昨收 ' + pre.toFixed(2) + '</text>';
+  // 均价线
+  svg += line(p => p.avg_price, '#f7b731', 1.3);
+  // 价格线（渐变填充面积可选，简单折线）
+  svg += line(p => p.price, priceColor, 1.8);
+  // 底部时间刻度
+  const times = [pts[0].time, '10:30', '11:30/13:00', '14:00', pts[n - 1].time];
+  times.forEach((t, i) => {
+    const tx = padL + plotW * i / (times.length - 1);
+    svg += '<text x="' + tx + '" y="' + (H - 14) + '" text-anchor="' + (i === 0 ? 'start' : i === times.length - 1 ? 'end' : 'middle') + '" font-size="10" fill="var(--faint)">' + t + '</text>';
+  });
+  // 右上角涨跌
+  const chg = pts[n - 1].price - pre;
+  const chgPct = pre ? (chg / pre * 100) : 0;
+  svg += '<text x="' + (W - padR) + '" y="' + (padT + 6) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + priceColor + '">' +
+    (up ? '+' : '') + chg.toFixed(2) + '  (' + (up ? '+' : '') + chgPct.toFixed(2) + '%)</text>';
+  svg += '</svg>';
+  $('kline-chart').innerHTML = svg;
 }

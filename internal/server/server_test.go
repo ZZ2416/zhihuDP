@@ -85,13 +85,22 @@ func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink f
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
 }
 
+// fakeMinuteProvider 分时桩
+type fakeMinuteProvider struct{}
+
+func (fakeMinuteProvider) GetMinute(_ context.Context, _, code string) (*types.MinuteResult, error) {
+	return &types.MinuteResult{Code: code, Name: "测试股", PreClose: 100, Points: []types.MinutePoint{
+		{Time: "09:30", Price: 100, AvgPrice: 100, Volume: 100},
+	}}, nil
+}
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
 		"index.html":    {Data: []byte("<html>test</html>")},
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

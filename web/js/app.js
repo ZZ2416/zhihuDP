@@ -55,6 +55,9 @@ async function doSearch() {
   $('quote-card').classList.add('hidden');
   $('quote-body').innerHTML = '';
   $('kline-chart').innerHTML = '';
+  minuteCache = null; // 分时缓存重置（新股票重新加载）
+  window.__lastKline = '';
+  if ($('tab-day')) { $('tab-day').classList.add('active'); $('tab-minute').classList.remove('active'); }
   $('news-card').classList.add('hidden');
   $('news-body').innerHTML = '';
   $('finance-card').classList.add('hidden');   // 财报卡片：切股重置

@@ -149,3 +149,20 @@ type FinanceResult struct {
 	Degraded   bool                 `json:"degraded"`
 	ErrMsg     string               `json:"err_msg,omitempty"`
 }
+
+// MinutePoint 分时数据点（每 1 分钟）
+type MinutePoint struct {
+	Time     string  `json:"time"`      // HH:MM
+	Price    float64 `json:"price"`     // 最新价
+	AvgPrice float64 `json:"avg_price"` // 均价线（东财源；腾讯兜底为 0）
+	Volume   float64 `json:"volume"`    // 成交量（手）
+}
+
+// MinuteResult 分时数据（当日）
+type MinuteResult struct {
+	Code     string        `json:"code"`
+	Name     string        `json:"name"`
+	PreClose float64       `json:"pre_close"` // 昨收（分时涨跌参照）
+	Points   []MinutePoint `json:"points"`
+	Degraded bool          `json:"degraded"`
+}

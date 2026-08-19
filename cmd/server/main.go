@@ -20,6 +20,7 @@ import (
 	"zhihudp/internal/hot"
 	"zhihudp/internal/keybox"
 	"zhihudp/internal/kline"
+	"zhihudp/internal/minute"
 	"zhihudp/internal/news"
 	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
@@ -104,6 +105,9 @@ func main() {
 		},
 	}
 
+	// 分时数据（东财主 + 腾讯兜底）
+	mp := &minuteProvider{get: minute.GetMinute}
+
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -118,6 +122,7 @@ func main() {
 		ks,              // 密钥箱：公钥下发 + 加密密钥热更新
 		chatSvc,         // 二期：看山追问对话
 		fp,              // 财报解析（东财双源 + AI）
+		mp,              // 分时数据（东财主 + 腾讯兜底）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -227,6 +232,18 @@ func (f *financeProvider) GetFinance(ctx context.Context, code, market string) (
 func (f *financeProvider) AnalyzeFinance(ctx context.Context, code, market string, sink func(types.Event) error) error {
 	return f.analyze(ctx, code, market, sink)
 }
+
+// minuteProvider 分时适配器
+type minuteProvider struct {
+	get func(ctx context.Context, market, code string) (*types.MinuteResult, error)
+}
+
+func (m *minuteProvider) GetMinute(ctx context.Context, market, code string) (*types.MinuteResult, error) {
+	return m.get(ctx, market, code)
+}
+
+// 编译期断言：minuteProvider 满足 server.MinuteProvider
+var _ server.MinuteProvider = (*minuteProvider)(nil)
 
 // 编译期断言：financeProvider 满足 server.FinanceProvider
 var _ server.FinanceProvider = (*financeProvider)(nil)

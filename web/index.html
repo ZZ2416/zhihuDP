@@ -67,6 +67,10 @@
     <div class="card hidden" id="quote-card">
       <div class="section-title">实时行情</div>
       <div id="quote-body"></div>
+      <div class="kline-tabs">
+        <button class="kline-tab active" id="tab-day" onclick="switchKline('day')">日K</button>
+        <button class="kline-tab" id="tab-minute" onclick="switchKline('minute')">分时</button>
+      </div>
       <div id="kline-chart"></div>
     </div>
 

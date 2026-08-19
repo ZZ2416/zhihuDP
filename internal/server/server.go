@@ -100,6 +100,11 @@ type KeyService interface {
 	PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error
 }
 
+// MinuteProvider 分时数据服务接口（由入口 minuteProvider 实现）
+type MinuteProvider interface {
+	GetMinute(ctx context.Context, market, code string) (*types.MinuteResult, error)
+}
+
 // FinanceProvider 财务解析服务接口（由入口 financeProvider 实现）
 type FinanceProvider interface {
 	// GetFinance 获取股票财务指标（5 年年报 + 最新报告期）
@@ -129,6 +134,7 @@ type Server struct {
 	keyService    KeyService
 	chatProvider  ChatProvider
 	finance       FinanceProvider
+	minute        MinuteProvider
 	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
 	mediaDir      string      // 媒体目录（/media/ 播放）；空 = 禁用
 	mediaToken    string      // 媒体访问令牌；空/不匹配 → 403（防未授权访问与转发）
@@ -136,7 +142,7 @@ type Server struct {
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, knowledge KnowledgeProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -147,6 +153,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		keyService:    keyService,
 		chatProvider:  chatProvider,
 		finance:       finance,
+		minute:        minute,
 		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		mediaDir:      mediaDir,
 		mediaToken:    mediaToken,
@@ -169,6 +176,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/chat/reset", s.handleChatReset)           // 二期：清空某股票会话
 	mux.HandleFunc("GET /api/finance", s.handleFinance)                 // 财务指标（展示数据）
 	mux.HandleFunc("POST /api/finance/analyze", s.handleFinanceAnalyze) // 财报 AI 解析（SSE，计配额）
+	mux.HandleFunc("GET /api/minute", s.handleMinute)                   // 分时数据（当日）
 	// 媒体播放（抖音式禁止转载）：token 校验 + 受保护播放页 + 视频流（Range 支持）
 	if s.mediaDir != "" && s.mediaToken != "" {
 		mux.HandleFunc("GET /media/player", s.handleMediaPlayer) // 播放页（禁下载/右键）
