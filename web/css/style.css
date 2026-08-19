@@ -425,3 +425,19 @@ footer p { margin: 3px 0; }
 }
 .chat-input-row button:hover { background: var(--accent-deep); }
 .chat-input-row button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ===== 财报解析卡片 ===== */
+.fin-source { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: auto; }
+.fin-loading { color: var(--faint); font-size: 13px; }
+.fin-table-wrap { overflow-x: auto; margin-bottom: 14px; }
+.fin-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.fin-table th, .fin-table td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: right; white-space: nowrap;
+}
+.fin-table th { background: var(--card-soft); color: var(--sub); font-weight: 600; }
+.fin-table td.fin-label, .fin-table th.fin-label { text-align: left; color: var(--text); font-weight: 600; background: var(--card-soft); }
+.fin-table td { color: var(--text); }
+.fin-foot { margin-top: 10px; font-size: 11px; color: var(--faint); }
+.fin-ai { font-size: 14px; line-height: 1.8; color: var(--text); }
+.fin-ai p { margin: 0 0 8px; }
+.fin-ai ul, .fin-ai ol { margin: 4px 0 8px; padding-left: 20px; }

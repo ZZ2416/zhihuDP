@@ -29,3 +29,8 @@ config.yaml
 /pic/v2-57ef90e293e644e853853915059e8e22_r.jpg
 /pic/fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg
 /web/pic/
+
+# 演示视频（只本地保存，不入库）
+/pic/*.mov
+/pic/*.mp4
+/pic/*.sb-*

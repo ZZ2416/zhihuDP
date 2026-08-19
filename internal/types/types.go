@@ -122,3 +122,29 @@ type ChatFacts struct {
 	Knowledge    string // 知识库检索片段
 	PrevAnalysis string // 一期 AI 分析文本（中性文案）
 }
+
+// FinancialIndicator 单报告期财务指标（数值已归一化为亿元 / %）
+type FinancialIndicator struct {
+	ReportDate     string  `json:"report_date"`      // 如 2025年报 / 2026中报
+	ReportDateFull string  `json:"report_date_full"` // 如 2025-12-31
+	Revenue        float64 `json:"revenue"`          // 营业总收入（亿元）
+	RevenueYoY     float64 `json:"revenue_yoy"`      // 营收同比 %
+	NetProfit      float64 `json:"net_profit"`       // 归母净利润（亿元）
+	NetProfitYoY   float64 `json:"net_profit_yoy"`   // 净利同比 %
+	EPS            float64 `json:"eps"`              // 每股收益（元）
+	ROE            float64 `json:"roe"`              // 加权净资产收益率 %
+	GrossMargin    float64 `json:"gross_margin"`     // 销售毛利率 %
+	NetMargin      float64 `json:"net_margin"`       // 销售净利率 %
+	DebtRatio      float64 `json:"debt_ratio"`       // 资产负债率 %
+	CashFlowToRev  float64 `json:"cash_flow_to_rev"` // 经营现金流/营收
+	DeductedProfit float64 `json:"deducted_profit"`  // 扣非净利润（亿元）
+}
+
+// FinanceResult 财务解析结果
+type FinanceResult struct {
+	Code       string               `json:"code"`
+	Name       string               `json:"name"`
+	Indicators []FinancialIndicator `json:"indicators"` // 5 年年报 + 最新报告期
+	Degraded   bool                 `json:"degraded"`
+	ErrMsg     string               `json:"err_msg,omitempty"`
+}

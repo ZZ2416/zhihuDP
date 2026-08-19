@@ -16,6 +16,7 @@ import (
 	"zhihudp/internal/agent"
 	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
+	"zhihudp/internal/finance"
 	"zhihudp/internal/hot"
 	"zhihudp/internal/keybox"
 	"zhihudp/internal/kline"
@@ -86,6 +87,20 @@ func main() {
 		},
 	})
 
+	// 财报解析服务（东财双源 + AI 解析）
+	fp := &financeProvider{
+		get: func(ctx context.Context, code, market string) (*types.FinanceResult, error) {
+			return finance.GetResult(ctx, code, market)
+		},
+		analyze: func(ctx context.Context, code, market string, sink func(types.Event) error) error {
+			res, err := finance.GetResult(ctx, code, market)
+			if err != nil {
+				return err
+			}
+			return agent.AnalyzeFinance(ctx, code, res.Name, res.Indicators, deps, sink)
+		},
+	}
+
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -99,6 +114,7 @@ func main() {
 		}),
 		ks,              // 密钥箱：公钥下发 + 加密密钥热更新
 		chatSvc,         // 二期：看山追问对话
+		fp,              // 财报解析（东财双源 + AI）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -194,6 +210,23 @@ func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
 func (k *keyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error {
 	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc, zhihuSecretEnc)
 }
+
+// financeProvider 财报服务适配器：数据（finance dao）+ AI 解析（agent）
+type financeProvider struct {
+	get     func(ctx context.Context, code, market string) (*types.FinanceResult, error)
+	analyze func(ctx context.Context, code, market string, sink func(types.Event) error) error
+}
+
+func (f *financeProvider) GetFinance(ctx context.Context, code, market string) (*types.FinanceResult, error) {
+	return f.get(ctx, code, market)
+}
+
+func (f *financeProvider) AnalyzeFinance(ctx context.Context, code, market string, sink func(types.Event) error) error {
+	return f.analyze(ctx, code, market, sink)
+}
+
+// 编译期断言：financeProvider 满足 server.FinanceProvider
+var _ server.FinanceProvider = (*financeProvider)(nil)
 
 // 编译期断言：keyService 满足 server.KeyService
 var _ server.KeyService = (*keyService)(nil)
