@@ -189,3 +189,24 @@ type Valuation struct {
 	PEEntPercent float64 `json:"pe_ent_percent"` // 当前 PE 历史分位 0-100；无数据 -1
 	Degraded     bool    `json:"degraded"`
 }
+
+// FundamentalScore 四维基本面评分（0-100）
+type FundamentalScore struct {
+	Profit int      `json:"profit"`            // 盈利能力
+	Growth int      `json:"growth"`            // 成长性
+	Health int      `json:"health"`            // 财务健康
+	Valuat int      `json:"valuation"`         // 估值
+	Total  int      `json:"total"`             // 加权总分
+	Grade  string   `json:"grade"`             // 质地强/良好/一般/偏弱
+	NoData []string `json:"no_data,omitempty"` // 数据不足的维度
+}
+
+// FundamentalResult 基本面聚合结果（指标 + 估值 + 评分）
+type FundamentalResult struct {
+	Code       string               `json:"code"`
+	Name       string               `json:"name"`
+	Indicators []FinancialIndicator `json:"indicators"`
+	Valuation  Valuation            `json:"valuation"`
+	Score      FundamentalScore     `json:"score"`
+	Degraded   bool                 `json:"degraded"`
+}
