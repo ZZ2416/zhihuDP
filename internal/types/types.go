@@ -166,3 +166,16 @@ type MinuteResult struct {
 	Points   []MinutePoint `json:"points"`
 	Degraded bool          `json:"degraded"`
 }
+
+// VideoItem 视频资讯（B站，GET /api/video 返回体元素）
+type VideoItem struct {
+	Title       string `json:"title"` // 已清洗高亮标签
+	Url         string `json:"url"`   // https://www.bilibili.com/video/BVxxx
+	Bvid        string `json:"bvid"`
+	Play        int64  `json:"play"`         // 播放量
+	Danmaku     int64  `json:"danmaku"`      // 弹幕数
+	Duration    string `json:"duration"`     // mm:ss
+	PublishTime string `json:"publish_time"` // YYYY-MM-DD HH:MM
+	Author      string `json:"author"`       // UP主
+	Degraded    bool   `json:"degraded"`
+}

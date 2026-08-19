@@ -94,13 +94,20 @@ func (fakeMinuteProvider) GetMinute(_ context.Context, _, code string) (*types.M
 	}}, nil
 }
 
+// fakeVideoProvider 视频资讯桩
+type fakeVideoProvider struct{}
+
+func (fakeVideoProvider) GetVideos(_ context.Context, keyword string, _ int) ([]types.VideoItem, error) {
+	return []types.VideoItem{{Title: "测试视频" + keyword, Url: "https://www.bilibili.com/video/BV1", Play: 100}}, nil
+}
+
 func newTestServer() *Server {
 	frontend := fstest.MapFS{
 		"index.html":    {Data: []byte("<html>test</html>")},
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

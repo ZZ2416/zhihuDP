@@ -73,3 +73,9 @@ async function apiMinute(code, market) {
   if (!resp.ok) return null;
   return resp.json();
 }
+
+async function apiVideo(keyword, count) {
+  const resp = await fetch('/api/video?keyword=' + encodeURIComponent(keyword) + '&count=' + (count || 10));
+  if (!resp.ok) return null;
+  return resp.json();
+}

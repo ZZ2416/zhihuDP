@@ -114,6 +114,18 @@
       <div id="news-body"></div>
     </div>
 
+    <!-- B站相关视频：按最近时间 / 播放量排序 -->
+    <div class="card hidden" id="video-card">
+      <div class="section-title">相关视频
+        <span class="video-sort">
+          <button class="video-sort-btn active" id="vs-time" onclick="sortVideos('time')">最新</button>
+          <button class="video-sort-btn" id="vs-play" onclick="sortVideos('play')">播放量</button>
+        </span>
+        <span class="fin-source">B站</span>
+      </div>
+      <div id="video-body"></div>
+    </div>
+
     <div id="error-box" class="card hidden"><div class="err-box"></div></div>
   </section>
 
@@ -192,6 +204,7 @@
 <script src="/js/app.js"></script>
 <script src="/js/chat.js"></script>
 <script src="/js/finance.js"></script>
+<script src="/js/video.js"></script>
 <script src="/js/keys.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@
 - 🔥 **热门板块 / 暴跌板块 / 热门股票**：侧边栏实时榜单，涨幅**四档分级配色**（跌绿 / 0~2% 黄 / 2~4% 橙 / ≥4% 红），点击直达查询
 - 📚 **讨论文章**：知乎知识库方形卡片，链接可用性校验（失效不展示）
 - 📰 **相关资讯**：东方财富资讯，标题可点击跳转原文
+- 🎬 **相关视频**：B站视频资讯（wbi 签名搜索），**按最近时间 / 播放量排序**切换，标题可跳转
 - 🔑 **密钥配置弹窗**：开屏动画 + 首次进入可配置自己的 DeepSeek / 知乎密钥（可跳过用默认）；用户密钥 **RSA 公私钥加密**传输，默认密钥绝不下发明文
 - ⚡ **SSE 流式输出**：分析面板逐字呈现
 - 🌙 **明暗主题**：手动切换 + 跟随系统偏好
@@ -43,7 +44,8 @@
 
 | 版本 | 里程碑 | 说明 |
 |---|---|---|
-| **v2.2** | 财报解析 + 分时图 | 东财双源财务指标（5年年报）+ AI 流式解读；日K/分时切换；看山对话注入财报上下文；东财资讯可跳转原文 |
+| **v2.3** | B站相关视频 | 视频资讯按时间/播放量排序（B站 wbi 签名）；含分时图交互与 30s 实时刷新、查询中占位 |
+| v2.2 | 财报解析 + 分时图 | 东财双源财务指标（5年年报）+ AI 流式解读；日K/分时切换；看山对话注入财报上下文；东财资讯可跳转原文 |
 | v2.0 | 与看山对话 | 二期：多轮追问对话（AI 看山 Agent，按股票隔离会话）、行情快照/知识库/前次分析注入上下文、合规过滤强化 |
 | v1.x | 一期核心 | 个股识别 → 行情/K线 → 情绪面板 → AI 分析；热门榜单、讨论文章、密钥弹窗（RSA 加密）、看山主题 |
 
@@ -137,6 +139,7 @@ curl "http://localhost:8080/api/resolve?q=600519"
 | `POST /api/finance/analyze` | 财报 AI 解析（SSE 流式，计配额） |
 | `GET /api/hot?type=stock\|sector\|sector_fall\|sector_stock` | 热门股票 / 上升板块 / 暴跌板块 / 板块成分股 |
 | `GET /api/news?keyword=&count=` | 相关资讯（标题可跳转原文） |
+| `GET /api/video?keyword=&count=` | 相关视频（B站，前端按时间/播放量排序） |
 | `GET /api/knowledge?q=&limit=` | 知识库搜索（讨论文章卡片，失效链接已过滤） |
 | `GET /api/config/pubkey` | 下发 RSA 公钥（密钥弹窗加密用） |
 | `POST /api/config/keys` | 提交加密后的用户密钥（RSA-OAEP，私钥仅服务端） |
@@ -153,6 +156,7 @@ zhihuDP/
 │   ├── sentiment/         # service 层：情绪分析（LLM 分类 + 规则强度分）
 │   ├── finance/           # dao 层：财务指标（东财 datacenter 主 + F10 兜底）
 │   ├── minute/            # dao 层：当日分时（东财 trends2 主 + 腾讯兜底）
+│   ├── video/             # dao 层：B站视频搜索（wbi 签名）
 │   ├── zhihu/             # dao 层：知乎搜索 + 知识库 RAG 客户端（Bearer 鉴权）
 │   ├── stock/             # dao 层：股票识别（东财 + 腾讯）
 │   ├── kline/             # dao 层：行情 K线（腾讯，除权处理）
@@ -180,6 +184,8 @@ zhihuDP/
 | [features/finance/SDD.md](features/finance/SDD.md) | 财报解析技术设计 |
 | [features/minute/SRS.md](features/minute/SRS.md) | 分时图需求规格 |
 | [features/minute/SDD.md](features/minute/SDD.md) | 分时图技术设计 |
+| [features/video/SRS.md](features/video/SRS.md) | B站相关视频需求规格 |
+| [features/video/SDD.md](features/video/SDD.md) | B站相关视频技术设计 |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 变更记录 |
 
 ## 路线图

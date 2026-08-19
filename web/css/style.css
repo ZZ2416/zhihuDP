@@ -452,3 +452,19 @@ footer p { margin: 3px 0; }
 }
 .kline-tab:hover { color: var(--text); border-color: var(--accent); }
 .kline-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ===== 相关视频（B站） ===== */
+.video-sort { margin-left: auto; display: flex; gap: 6px; }
+.video-sort-btn {
+  font-size: 11px; padding: 2px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--card); color: var(--sub); transition: all .2s;
+}
+.video-sort-btn:hover { color: var(--text); }
+.video-sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.video-list { display: flex; flex-direction: column; }
+.video-item { padding: 9px 2px; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
+.video-item:first-child { border-top: none; }
+.video-item a.t { flex: 1; font-size: 13px; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-item a.t:hover { color: var(--accent); text-decoration: underline; }
+.video-item .meta { font-size: 11px; color: var(--sub); white-space: nowrap; }
+.video-item .date { font-size: 11px; color: var(--faint); white-space: nowrap; }
