@@ -10,12 +10,8 @@ async function loadVideo(name) {
   card.classList.remove('hidden');
   $('video-body').innerHTML = '<span class="fin-loading">加载相关视频…</span>';
   try {
-    const resp = await apiVideo(name, 15);
-    if (!resp.ok) {
-      const j = await resp.json().catch(() => ({}));
-      throw new Error(j.error || ('HTTP ' + resp.status));
-    }
-    const items = await resp.json();
+    // apiVideo 直接返回解析后的 JSON（null=接口失败）
+    const items = await apiVideo(name, 15);
     if (!items || !items.length) {
       $('video-body').innerHTML = '<span class="fin-loading">暂无相关视频</span>';
       return;
