@@ -181,7 +181,9 @@ header {
 .news-list { display: flex; flex-direction: column; }
 .news-item { padding: 10px 2px; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
 .news-item:first-child { border-top: none; }
-.news-item .t { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; cursor: default; }
+.news-item .t { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+.news-item a.t { cursor: pointer; color: var(--text); text-decoration: none; }
+.news-item a.t:hover { color: var(--accent); text-decoration: underline; }
 .news-item .date { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .news-item .src { font-size: 11px; color: var(--accent); white-space: nowrap; }
 
