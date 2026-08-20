@@ -19,7 +19,7 @@ const browserUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 
 var (
 	emTrendsURL = "https://push2his.eastmoney.com/api/qt/stock/trends2/get" // 主：东财分时
-	txMinuteURL = "https://web.ifzq.gtimg.cn/appstock/app/minute/query"    // 备：腾讯分时
+	txMinuteURL = "https://web.ifzq.gtimg.cn/appstock/app/minute/query"     // 备：腾讯分时
 )
 
 // GetMinute 获取当日分时；主（东财）失败自动切兜底（腾讯）
@@ -113,9 +113,9 @@ func fetchTx(ctx context.Context, market, code string) (*types.MinuteResult, err
 		Code int `json:"code"`
 		Data map[string]struct {
 			Data struct {
-				Data  []string `json:"data"`
-				Date  string   `json:"date"`
-				Qt    struct {
+				Data []string `json:"data"`
+				Date string   `json:"date"`
+				Qt   struct {
 					PreClose float64 `json:"prec"`
 				} `json:"qt"`
 			} `json:"data"`

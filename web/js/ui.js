@@ -1,8 +1,6 @@
-/* ui.js —— 展示层：报价卡 / 情绪面板 / 错误提示 渲染 */
-const sentiLabel = { bull: '看多', bear: '看空', neutral: '中性' };
-const scoreClass = n => n <= 3 ? 'low' : (n <= 7 ? 'mid' : 'high');
+/* ui.js —— 展示层：报价卡 / 资讯 / 热门 / 基本面评分 渲染 */
 
-/* ---- 报价卡 ---- */
+/* ---- 实时报价卡（fetchKline 调用） ---- */
 function renderQuote(q) {
   const lvl = chgLevel(q.change_pct);
   const up = (q.change || 0) >= 0;
@@ -28,52 +26,6 @@ function qCell(k, v) {
   return '<div class="q-cell"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
 }
 
-/* ---- 情绪面板 ---- */
-function renderSentiment(s) {
-  if (!s) return;
-  let html = '';
-  if (s.degraded) {
-    html += '<div class="degraded">' + esc(s.err_msg || '数据不足，已降级展示') + '</div>';
-  }
-  html += '<div class="heat"><span class="num">' + (s.heat || 0) + '</span>' +
-    '<span class="label">条近期讨论</span>' +
-    '<span class="sample">样本 ' + (s.sample || 0) + ' 条</span></div>';
-
-  const r = s.ratio || {};
-  html += ratioRow('看多', 'bull', r.bull) + ratioRow('看空', 'bear', r.bear) + ratioRow('中性', 'neutral', r.neutral);
-
-  if (s.score != null) {
-    html += '<div class="score-box">' +
-      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--faint)">/10</small></span>' +
-      '<span class="score-note">参考强度：反映当前讨论情绪与数据的充分程度，不代表涨跌预测。</span></div>';
-  }
-
-  const items = s.items || [];
-  if (items.length) {
-    html += '<div class="section-title" style="margin-top:18px">代表观点</div><div class="items">';
-    for (const it of items) {
-      html += '<div class="item">' +
-        '<div class="title-line">' +
-        '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '(无标题)') + '</a>' +
-        '<span class="tag-sentiment ' + esc(it.sentiment || 'neutral') + '">' + esc(sentiLabel[it.sentiment] || '中性') + '</span>' +
-        '</div>' +
-        '<div class="meta"><span>✍️ ' + esc(it.author || '匿名') + '</span><span>👍 ' + (it.vote_up || 0) + '</span></div>' +
-        '<div class="excerpt">' + esc(it.excerpt || '') + '</div>' +
-        '</div>';
-    }
-    html += '</div>';
-  }
-  $('sentiment-body').innerHTML = html;
-}
-
-function ratioRow(label, cls, val) {
-  const p = Math.round((val || 0) * 100);
-  return '<div class="ratio-row"><span class="rlabel">' + label + '</span>' +
-    '<div class="bar"><div class="' + cls + '" style="width:' + p + '%"></div></div>' +
-    '<span class="rpct">' + p + '%</span></div>';
-}
-
-/* ---- 相关资讯（辅助，仅参考展示，不跳转外部） ---- */
 function renderNews(items) {
   if (!items || !items.length) return; // 无资讯不显示卡片
   let html = '<div class="news-list">';
@@ -126,7 +78,8 @@ function renderHotStocks(items) {
   for (const it of items) {
     const lvl = chgLevel(it.change_pct);
     const up = lvl !== 'down';
-    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(it.name) + '\')" title="点击查询 ' + esc(it.name) + '">' +
+    const hn = String(it.name || '').replace(/'/g, '');
+    html += '<div class="hot-stock" onclick="hotSearch(\'' + esc(hn) + '\')" title="点击查询 ' + esc(it.name) + '">' +
       '<span class="sn">' + esc(it.name) + '</span>' +
       '<span class="sc">' + esc(it.code) + '</span>' +
       '<span class="sp">' + (it.price || 0).toFixed(2) + '</span>' +
@@ -158,59 +111,37 @@ function renderTicker(items) {
   el.innerHTML = '<div class="ticker-track">' + group + group + '</div>';
 }
 
-/* ---- 热门辅助数据：友好降级 ---- */
-const hotDegradedMap = {
-  stock: ['hot-stocks', 'hot-stocks-card'],
-  sector: ['hot-sectors', 'hot-sectors-card'],
-  sector_fall: ['hot-fall', 'hot-fall-card'],
-};
-function showHotDegraded(type) {
-  const pair = hotDegradedMap[type] || ['hot-sectors', 'hot-sectors-card'];
-  const id = pair[0], card = pair[1];
-  $('hot-stocks-label') && ($('hot-stocks-label').textContent = '');
-  $('hot-stocks-back') && $('hot-stocks-back').classList.add('hidden');
-  $(id).innerHTML = '<div class="degraded" style="margin-top:8px">热门行情数据暂时不可用，请稍后重试。' +
-    '<a style="margin-left:8px;cursor:pointer" onclick="retryHot()">重试</a></div>';
-  $(card).classList.remove('hidden');
-}
-
-/* ---- 讨论文章（知识库搜索，方形卡片） ---- */
-function renderKnowledge(items) {
-  const el = $('knowledge');
-  if (!items || !items.length) { $('knowledge-card').classList.add('hidden'); return; }
-  let html = '';
-  for (const it of items) {
-    const title = it.doc_name || '知乎讨论';
-    const excerpt = (it.content && it.content[0]) ? it.content[0].slice(0, 120) : '';
-    html += '<div class="k-card" data-url="' + esc(it.origin_url || '') + '">' +
-      '<div class="k-title"><a href="' + esc(it.origin_url || '#') + '" target="_blank" rel="noopener">' + esc(title) + '</a></div>' +
-      '<div class="k-excerpt">' + esc(excerpt) + '</div>' +
-      (it.origin_url ? '<a class="k-link" href="' + esc(it.origin_url) + '" target="_blank" rel="noopener">查看讨论 ↗</a>' : '') +
-      '</div>';
+/* ---- 基本面评分渲染（ask 的 fundamental 事件） ---- */
+function renderFundamental(d) {
+  const el = $('fundamental-score');
+  if (!el) return;
+  if (!d || !d.score) { el.innerHTML = '<span class="fin-loading">暂无评分数据</span>'; return; }
+  const sc = d.score, v = d.valuation || {};
+  const dims = [
+    ['盈利能力', sc.profit], ['成长性', sc.growth],
+    ['财务健康', sc.health], ['估值', sc.valuation],
+  ];
+  let rows = '';
+  for (const [name, val] of dims) {
+    const cls = val >= 75 ? 'up3' : (val >= 60 ? 'up2' : (val >= 40 ? 'up1' : 'down'));
+    rows += '<div class="fd-row"><span class="fd-name">' + name + '</span>' +
+      '<span class="fd-bar"><span class="fd-fill ' + cls + '" style="width:' + val + '%"></span></span>' +
+      '<span class="fd-val ' + cls + '">' + val + '</span></div>';
   }
-  el.innerHTML = html;
-  $('knowledge-card').classList.remove('hidden');
-  probeKnowledgeLinks(); // 网络可达性探测：不可达的卡片隐藏
-}
-
-/* ---- 卡片链接可用性校验（no-cors 探测） ----
- * 跨域 fetch 受 CORS 限制无法读取状态码（知乎未开 CORS），但可区分「网络层可达/不可达」：
- * 请求成功（任何 HTTP 响应，含 404/403）→ 保留；网络层失败（DNS/连接拒绝等）→ 隐藏。
- * 服务端已过滤空/非法链接（handler_knowledge.go filterInvalidLinks），此处为兜底。
- */
-function probeKnowledgeLinks() {
-  const note = document.getElementById('knowledge-note');
-  if (note) note.textContent = '';
-  let hidden = 0;
-  const cards = document.querySelectorAll('#knowledge .k-card');
-  cards.forEach(card => {
-    const url = card.getAttribute('data-url');
-    if (!url || url === '#') { card.remove(); hidden++; return; }
-    // HEAD 免下载正文；no-cors 下任何 HTTP 响应（含 404）都 resolve
-    fetch(url, { method: 'HEAD', mode: 'no-cors' })
-      .catch(() => { card.remove(); hidden++; })
-      .finally(() => {
-        if (hidden > 0 && note) note.textContent = '已隐藏 ' + hidden + ' 条链接不可用的讨论';
-      });
-  });
+  const total = sc.total || 0;
+  const grade = sc.grade || '';
+  const tcls = total >= 75 ? 'up3' : (total >= 60 ? 'up2' : (total >= 40 ? 'up1' : 'down'));
+  const valLines = [
+    'PE(TTM) ' + (v.pe ? v.pe.toFixed(2) : '—') +
+      (v.pe_ent_percent >= 0 ? '（历史分位 ' + v.pe_ent_percent.toFixed(0) + '%）' : '（分位不可用）'),
+    'PB ' + (v.pb ? v.pb.toFixed(2) : '—') +
+      (v.market_cap ? ' · 市值 ' + v.market_cap.toFixed(0) + '亿' : ''),
+  ];
+  el.innerHTML =
+    '<div class="fd-total"><span class="fd-t-num ' + tcls + '">' + total + '</span>' +
+    '<span class="fd-t-grade ' + tcls + '">' + esc(grade) + '</span></div>' +
+    '<div class="fd-dims">' + rows + '</div>' +
+    '<div class="fd-val-line">' + valLines.map(esc).join(' · ') + '</div>' +
+    (sc.no_data && sc.no_data.length ? '<div class="fd-nodata">数据不足维度：' + esc(sc.no_data.join('、')) + '（评分按可用维度归一）</div>' : '');
+  $('fundamental-card').classList.remove('hidden');
 }

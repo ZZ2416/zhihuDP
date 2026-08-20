@@ -5,7 +5,7 @@
 # 用法（在云服务器上以 root 或 sudo 执行）：
 #
 #   方式 A：环境变量提供密钥（推荐，明文不落盘，直接生成密文）
-#     DEEPSEEK_API_KEY="sk-xxx" ZHIHU_ACCESS_SECRET="xxx" \
+#     DEEPSEEK_API_KEY="sk-xxx" \
 #       bash install.sh
 #
 #   方式 B：交互输入密钥（终端不回显）
@@ -139,13 +139,11 @@ chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 # ---------- 5. 密钥配置（密文入库，私钥仅本机） ----------
 # 5.0 收集密钥：环境变量 > 交互输入 > 留空（开屏上传）
 DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
-ZHIHU_ACCESS_SECRET="${ZHIHU_ACCESS_SECRET:-}"
-if [[ -z "$DEEPSEEK_API_KEY" && -z "$ZHIHU_ACCESS_SECRET" ]]; then
-  warn "未检测到环境变量密钥（DEEPSEEK_API_KEY / ZHIHU_ACCESS_SECRET）"
+if [[ -z "$DEEPSEEK_API_KEY" ]]; then
+  warn "未检测到环境变量密钥（DEEPSEEK_API_KEY）"
   read -r -p "是否现在交互输入密钥？[y/N] " _ans
   if [[ "$_ans" =~ ^[Yy]$ ]]; then
     read -r -s -p "DeepSeek API Key: " DEEPSEEK_API_KEY; echo
-    read -r -s -p "知乎 Access Secret: " ZHIHU_ACCESS_SECRET; echo
   else
     warn "跳过：部署后打开网页，在开屏弹窗里上传密钥（同样 RSA 加密持久化）"
   fi
@@ -178,18 +176,13 @@ encrypt_key() {
   local q; q="$(printf '%q' "$1")"
   su -s /bin/bash "$APP_USER" -c "/opt/zhihudp/zhihudp -enc ${q} -config ${CONFIG_PATH}" 2>/dev/null || true
 }
-DEEPSEEK_ENC=""; ZHIHU_ENC=""
+DEEPSEEK_ENC=""
 if [[ -n "$DEEPSEEK_API_KEY" ]]; then DEEPSEEK_ENC="$(encrypt_key "$DEEPSEEK_API_KEY")"; fi
-if [[ -n "$ZHIHU_ACCESS_SECRET" ]]; then ZHIHU_ENC="$(encrypt_key "$ZHIHU_ACCESS_SECRET")"; fi
 
 # 5.3 组装最终 config.yaml（仅密文）
 {
   echo "keybox:"
   echo "  private_key: \"${PRIVATE_KEY}\""
-  echo "zhihu:"
-  echo "  access_secret_enc: \"${ZHIHU_ENC}\""
-  echo "  openapi_base_url: \"https://developer.zhihu.com\""
-  echo "  knowledge_base_id: \"7520243014858214186\""
   echo "deepseek:"
   echo "  api_key_enc: \"${DEEPSEEK_ENC}\""
   echo "  base_url: \"https://api.deepseek.com\""

@@ -16,37 +16,7 @@ type StockInfo struct {
 	Market string `json:"market"` // 如 沪A / 深A / 北A
 }
 
-// Ratio 多空占比（0-1 比例）
-type Ratio struct {
-	Bull    float64 `json:"bull"`
-	Bear    float64 `json:"bear"`
-	Neutral float64 `json:"neutral"`
-}
-
-// ViewItem 代表观点
-type ViewItem struct {
-	Title     string `json:"title"`
-	Url       string `json:"url"`
-	Author    string `json:"author"`
-	VoteUp    int    `json:"vote_up"`
-	Excerpt   string `json:"excerpt"`
-	Sentiment string `json:"sentiment"` // bull/bear/neutral
-}
-
-// SentimentResult 情绪面板结构化数据（SSE sentiment 事件负载）
-type SentimentResult struct {
-	Code     string     `json:"code"`
-	Name     string     `json:"name"`
-	Heat     int        `json:"heat"`   // 讨论量（demo：本次取回条数）
-	Sample   int        `json:"sample"` // 实际分类样本数
-	Ratio    Ratio      `json:"ratio"`
-	Score    *int       `json:"score"`    // 参考强度 1-10；样本不足为 nil
-	Items    []ViewItem `json:"items"`    // 代表观点 ≤5
-	Degraded bool       `json:"degraded"` // true=降级（样本不足/搜索失败）
-	ErrMsg   string     `json:"err_msg,omitempty"`
-}
-
-// Event 对外事件（SSE 事件协议：stock / sentiment / delta / done / error）
+// Event 对外事件（SSE 事件协议：stock / fundamental / delta / done / error）
 type Event struct {
 	Type string
 	Data any
@@ -99,13 +69,6 @@ type HotItem struct {
 	Type      string  `json:"type"`       // stock / sector
 }
 
-// KnowledgeItem 知识库搜索结果条目（GET /api/knowledge 返回体元素）
-type KnowledgeItem struct {
-	Content   []string `json:"content"`    // 命中的内容片段
-	DocName   string   `json:"doc_name"`   // 文档名（讨论标题）
-	OriginUrl string   `json:"origin_url"` // 知乎原文链接
-}
-
 // ChatMessage 追问对话消息（会话历史）
 type ChatMessage struct {
 	Role    string `json:"role"` // user / assistant
@@ -118,10 +81,10 @@ type ChatFacts struct {
 	StockCode    string
 	Market       string // 市场（沪A/深A）
 	Quote        string // 行情快照文本（报价级）
-	Sentiment    string // 情绪面板摘要文本
 	Finance      string // 财务指标摘要（最近5年年报+最新期）
-	Knowledge    string // 知识库检索片段
-	PrevAnalysis string // 一期 AI 分析文本（中性文案）
+	Valuation    string // 估值摘要（PE/PB/分位，功能点7注入）
+	Score        string // 四维评分摘要（功能点7注入）
+	PrevAnalysis string // 一期 AI 分析文本
 }
 
 // FinancialIndicator 单报告期财务指标（数值已归一化为亿元 / %）
@@ -179,4 +142,34 @@ type VideoItem struct {
 	PublishTime string `json:"publish_time"` // YYYY-MM-DD HH:MM
 	Author      string `json:"author"`       // UP主
 	Degraded    bool   `json:"degraded"`
+}
+
+// Valuation 估值（当前值 + 历史分位）
+type Valuation struct {
+	PE           float64 `json:"pe"`             // PE(TTM)，统一东财口径
+	PB           float64 `json:"pb"`             // PB(MRQ)，腾讯
+	MarketCap    float64 `json:"market_cap"`     // 总市值（亿元），腾讯
+	PEEntPercent float64 `json:"pe_ent_percent"` // 当前 PE 历史分位 0-100；无数据 -1
+	Degraded     bool    `json:"degraded"`
+}
+
+// FundamentalScore 四维基本面评分（0-100）
+type FundamentalScore struct {
+	Profit int      `json:"profit"`            // 盈利能力
+	Growth int      `json:"growth"`            // 成长性
+	Health int      `json:"health"`            // 财务健康
+	Valuat int      `json:"valuation"`         // 估值
+	Total  int      `json:"total"`             // 加权总分
+	Grade  string   `json:"grade"`             // 质地强/良好/一般/偏弱
+	NoData []string `json:"no_data,omitempty"` // 数据不足的维度
+}
+
+// FundamentalResult 基本面聚合结果（指标 + 估值 + 评分）
+type FundamentalResult struct {
+	Code       string               `json:"code"`
+	Name       string               `json:"name"`
+	Indicators []FinancialIndicator `json:"indicators"`
+	Valuation  Valuation            `json:"valuation"`
+	Score      FundamentalScore     `json:"score"`
+	Degraded   bool                 `json:"degraded"`
 }

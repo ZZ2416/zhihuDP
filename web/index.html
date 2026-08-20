@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>知乎大盘 · 知乎股票情绪分析</title>
+<title>知乎大盘 · 股票基本面聚合分析</title>
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/css/style.css">
@@ -16,7 +16,7 @@
     <span>知乎大盘</span>
   </div>
   <div class="header-right">
-    <span class="tag">知乎股票情绪分析 · 信息工具</span>
+    <span class="tag">股票基本面聚合分析 · 信息工具</span>
     <button id="theme-btn" title="切换明暗主题" onclick="toggleTheme()">🌙</button>
   </div>
 </header>
@@ -36,8 +36,8 @@
       <section id="view-search" class="view">
         <div class="hero">
           <img class="mascot" src="/pic/kanshan.jpg" alt="看山" title="看山">
-          <h2>看看知乎上大家在聊什么</h2>
-          <p>输入股票名称或代码，查看价格走势、讨论情绪与 AI 解读</p>
+          <h2>看看一只股票的基本面质地</h2>
+          <p>输入股票名称或代码，查看行情、财务、估值与 AI 解读</p>
         </div>
         <div class="card search-card">
           <div class="search">
@@ -45,15 +45,9 @@
             <button id="search-btn" onclick="doSearch()">查询</button>
           </div>
           <div id="suggest" class="suggest hidden"></div>
-          <div class="hint">数据来源：知乎公开讨论 · 行情与情绪仅供参考</div>
+          <div class="hint">数据来源：东方财富 / 腾讯 · 基本面信息仅供参考</div>
         </div>
 
-        <!-- 讨论文章（知识库搜索，方形卡片） -->
-        <div class="card hot-card hidden" id="knowledge-card">
-          <div class="section-title">讨论文章</div>
-          <div class="knowledge-grid" id="knowledge"></div>
-          <div id="knowledge-note" class="k-note"></div>
-        </div>
       </section>
 
       <!-- 详情视图 -->
@@ -74,24 +68,24 @@
       <div id="kline-chart"></div>
     </div>
 
-    <!-- 二期：与看山对话（K 线面板下方，独立对话区） -->
+    <!-- 与看山对话（K 线面板下方，独立对话区） -->
     <div class="card hidden" id="chat-card">
       <div class="chat-head">
         <img class="chat-avatar" src="/pic/kanshan.jpg" alt="看山">
         <div class="chat-title-box">
           <div class="section-title" style="margin:0">与看山对话</div>
-          <div class="chat-sub">基于本次分析结果继续提问 · 看山是信息工具，不提供买卖建议</div>
+          <div class="chat-sub">基于本次分析结果继续提问 · 信息工具，不提供买卖建议</div>
         </div>
         <button class="chat-clear" onclick="clearChat()">清空</button>
       </div>
       <div class="chat-msgs" id="chat-msgs"></div>
       <div class="chat-input-row">
-        <input id="chat-input" placeholder="继续追问，如：情绪为什么偏空？" autocomplete="off" spellcheck="false">
+        <input id="chat-input" placeholder="继续追问，如：ROE 为什么下降？" autocomplete="off" spellcheck="false">
         <button id="chat-send" onclick="sendChat()">发送</button>
       </div>
     </div>
 
-    <!-- 财报解析：核心指标表格 + AI 解析（东财双源）——位于情绪面板上方 -->
+    <!-- 财报解析：核心指标表格 + AI 解析（东财双源） -->
     <div class="card hidden" id="finance-card">
       <div class="section-title">财务解析 <span class="fin-source">东方财富 · 最近5年年报</span></div>
       <div id="finance-table"></div>
@@ -99,14 +93,11 @@
       <div class="fin-foot">数据来源：东方财富 · 财报解读仅供参考，不构成投资建议</div>
     </div>
 
-    <div class="card">
-      <div class="section-title">情绪面板</div>
-      <div id="sentiment-body"><span style="color:var(--faint)">正在分析…</span></div>
-    </div>
-
-    <div class="card">
-      <div class="section-title">AI 分析</div>
-      <div id="analysis"></div><span id="cursor" class="blink"></span>
+    <!-- 基本面分析：四维评分 + 估值 + AI 解读（ask 的 fundamental 事件与 delta） -->
+    <div class="card hidden" id="fundamental-card">
+      <div class="section-title">基本面分析 <span class="fin-source">东方财富 / 腾讯</span></div>
+      <div id="fundamental-score" class="fund-score"><span class="fin-loading">正在评分…</span></div>
+      <div id="fundamental-analysis"><span id="cursor" class="blink"></span></div>
     </div>
 
     <div class="card hidden" id="news-card">
@@ -160,8 +151,8 @@
     <span class="dot">·</span>
     <a href="https://github.com/ZZ2416/zhihuDP/issues" target="_blank" rel="noopener">联系与反馈</a>
   </div>
-  <p>本工具仅整理展示知乎公开讨论信息，不构成任何投资建议。据此操作，风险自担。</p>
-  <p>参考强度反映讨论情绪与数据的充分程度，不代表涨跌预测。</p>
+  <p>本工具聚合展示东方财富/腾讯等公开行情与财务信息并做基本面解读，不构成任何投资建议。据此操作，风险自担。</p>
+  <p>评分反映基本面质地，不代表涨跌预测。</p>
 </footer>
 
 <!-- 开屏动画（banner 看山图） -->
@@ -175,14 +166,12 @@
   <div id="key-modal">
     <h3 id="key-modal-title">🔑 配置你的密钥</h3>
     <div class="modal-desc">
-      填入你自己的 <b>DeepSeek API Key</b> 与 <b>知乎三方 API Key</b>，数据仅由你本机使用。
+      填入你自己的 <b>DeepSeek API Key</b>，数据仅由你本机使用。
       密钥在浏览器内用 <b>RSA 公钥加密</b> 后传输，服务端私钥解密，明文不落日志。
       不填则点击「跳过」，使用内置默认密钥。
     </div>
     <label for="key-deepseek">DeepSeek API Key（可留空）</label>
     <input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
-    <label for="key-zhihu">知乎三方 API Key / Access Secret（可留空）</label>
-    <input id="key-zhihu" type="password" placeholder="access secret" autocomplete="off" spellcheck="false">
     <div class="key-actions">
       <button class="btn btn-skip" id="key-skip" onclick="skipKeys()">跳过，使用默认密钥</button>
       <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>

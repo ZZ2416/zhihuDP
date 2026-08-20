@@ -56,9 +56,9 @@ func (fakeKeyService) PublicKeyPEM() string {
 
 func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []byte(b64), nil }
 
-func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
+func (fakeKeyService) UpdateKeys(deepseekKey string) error { return nil }
 
-func (fakeKeyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error { return nil }
+func (fakeKeyService) PersistKeys(deepseekKeyEnc string) error { return nil }
 
 // fakeChatProvider 二期对话桩：直接回一段 delta
 type fakeChatProvider struct{}
@@ -67,7 +67,7 @@ func (fakeChatProvider) Chat(_ context.Context, _, _, _ string, sink func(types.
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "看山觉得…"}})
 }
 
-func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ *types.SentimentResult, _ string) {
+func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ string) {
 }
 
 func (fakeChatProvider) Reset(_ string) {}
@@ -83,6 +83,13 @@ func (fakeFinanceProvider) GetFinance(_ context.Context, code, _ string) (*types
 
 func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink func(types.Event) error) error {
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
+}
+
+// fakeFundamentalProvider 基本面评分桩
+type fakeFundamentalProvider struct{}
+
+func (fakeFundamentalProvider) GetScore(_ context.Context, code, _ string) (*types.FundamentalResult, error) {
+	return &types.FundamentalResult{Code: code, Name: "测试股", Score: types.FundamentalScore{Total: 70, Grade: "质地良好"}}, nil
 }
 
 // fakeMinuteProvider 分时桩
@@ -107,7 +114,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKnowledgeProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)
@@ -202,26 +209,6 @@ func (fakeHotProvider) GetHot(_ context.Context, typ string, _ int) ([]types.Hot
 
 func (fakeHotProvider) GetSectorStocks(_ context.Context, _ string, _ int) ([]types.HotItem, error) {
 	return []types.HotItem{{Code: "002594", Name: "比亚迪", Price: 88.9, ChangePct: 1.2, Type: "stock"}}, nil
-}
-
-type fakeKnowledgeProvider struct{}
-
-func (fakeKnowledgeProvider) KnowledgeSearch(_ context.Context, _ string, _ []string, _ int) ([]types.KnowledgeItem, error) {
-	return []types.KnowledgeItem{{DocName: "测试讨论", OriginUrl: "https://www.zhihu.com/", Content: []string{"股票讨论内容"}}}, nil
-}
-
-func TestFilterInvalidLinks(t *testing.T) {
-	items := []types.KnowledgeItem{
-		{DocName: "有链接", OriginUrl: "https://zhuanlan.zhihu.com/p/1993980027537229643"},
-		{DocName: "空链接", OriginUrl: ""},
-		{DocName: "非http", OriginUrl: "javascript:alert(1)"},
-		{DocName: "无host", OriginUrl: "https://"},
-		{DocName: "非法url", OriginUrl: "ht tp://x"},
-	}
-	got := filterInvalidLinks(items)
-	if len(got) != 1 || got[0].DocName != "有链接" {
-		t.Fatalf("期望仅保留合法链接条目，实际 %d 条: %+v", len(got), got)
-	}
 }
 
 func TestQuotaStore(t *testing.T) {
@@ -326,5 +313,28 @@ func TestMediaTokenProtection(t *testing.T) {
 	s.Routes().ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("路径穿越应 404，实际 %d", rec.Code)
+	}
+}
+
+func TestFundamentalHandler(t *testing.T) {
+	s := newTestServer()
+	// 正常：6 位代码
+	req := httptest.NewRequest(http.MethodGet, "/api/fundamental?code=600519&market=沪A", nil)
+	rec := httptest.NewRecorder()
+	s.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("期望 200，实际 %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "质地良好") {
+		t.Errorf("响应应含评分: %s", rec.Body.String())
+	}
+	// 非法 code（7 位 / 非数字）→ 400
+	for _, bad := range []string{"0000010", "abc", "60051"} {
+		req = httptest.NewRequest(http.MethodGet, "/api/fundamental?code="+bad, nil)
+		rec = httptest.NewRecorder()
+		s.Routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("code=%s 期望 400，实际 %d", bad, rec.Code)
+		}
 	}
 }

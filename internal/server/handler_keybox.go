@@ -25,7 +25,6 @@ func (s *Server) handlePubKey(w http.ResponseWriter, r *http.Request) {
 // updateKeysRequest 前端加密提交的密钥（base64 RSA-OAEP 密文，字段为空表示该项跳过）
 type updateKeysRequest struct {
 	DeepseekKey string `json:"deepseek_key_enc"` // 加密的 DeepSeek API Key
-	ZhihuSecret string `json:"zhihu_secret_enc"` // 加密的知乎 Access Secret
 }
 
 // handleUpdateKeys POST /api/config/keys
@@ -46,18 +45,15 @@ func (s *Server) handleUpdateKeys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "DeepSeek 密钥解密失败"})
 		return
 	}
-	zk, err := s.keyService.DecryptOAEPBase64(req.ZhihuSecret)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "知乎密钥解密失败"})
-		return
-	}
-	if err := s.keyService.UpdateKeys(string(dk), string(zk)); err != nil {
+	if err := s.keyService.UpdateKeys(string(dk)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	// 持久化密文到 config.yaml（只写 *_enc 字段）：重启后加载解密恢复，仓库/配置无明文
-	if err := s.keyService.PersistKeys(req.DeepseekKey, req.ZhihuSecret); err != nil {
+	persisted := true
+	if err := s.keyService.PersistKeys(req.DeepseekKey); err != nil {
 		log.Printf("[keybox] 密文持久化失败: %v（密钥已热更新，重启后需重新上传）", err)
+		persisted = false
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": true})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": persisted})
 }

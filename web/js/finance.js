@@ -1,6 +1,5 @@
 /* finance.js —— 财报解析：指标表格（5 年年报）+ AI 解析（SSE 流式，自动触发） */
-let finAnalysisTimer = null;
-
+let renderMdTimer = null;
 /* 财务指标行定义：label + 取值函数 + 百分比格式 */
 const FIN_ROWS = [
   ['营业总收入（亿）', it => it.revenue, 1],
@@ -82,7 +81,8 @@ async function analyzeFinance(code, market) {
       try { d = data ? JSON.parse(data) : {}; } catch (e) {}
       if (event === 'delta') {
         text += d.text || '';
-        el.innerHTML = renderMarkdown(text);
+        clearTimeout(renderMdTimer); // 防抖：80ms 内合并增量，避免每 delta 全量重渲染 O(n²)
+        renderMdTimer = setTimeout(() => { el.innerHTML = renderMarkdown(text); }, 80);
       } else if (event === 'error') {
         el.innerHTML = '<span style="color:var(--err-text)">财报解析失败：' + esc(d.message || '请稍后重试') + '</span>';
       }

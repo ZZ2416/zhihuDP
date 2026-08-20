@@ -1,6 +1,6 @@
 // Package chat service 层：追问对话的会话存储与上下文事实组装
-// 二期「AI 看山」对话：每个股票独立会话；一期 /api/ask 结果快照（情绪+分析）绑定；
-// 对话时实时取行情快照（报价级）与知识库片段，注入 agent.Chat。
+// 每个股票独立会话；一期 /api/ask 结果快照（分析文本）绑定；
+// 对话时实时取行情快照（报价级）与财务/估值数据，注入 agent.Chat。
 package chat
 
 import (
@@ -14,9 +14,8 @@ import (
 
 // Snapshot 一期 /api/ask 结果快照（由 handler_ask 捕获事件写入）
 type Snapshot struct {
-	Stock     types.StockInfo        // 股票信息（code/name/market）
-	Sentiment *types.SentimentResult // 情绪面板结果（可能为 nil，如降级）
-	Analysis  string                 // 一期 AI 分析最终文本（中性文案）
+	Stock    types.StockInfo // 股票信息（code/name/market）
+	Analysis string          // 一期 AI 分析最终文本
 }
 
 // Session 单个股票的对话会话
@@ -119,10 +118,10 @@ func (s *Store) History(code string) []types.ChatMessage {
 type Deps struct {
 	// Quote 实时取行情快照（报价级）：由 kline.GetKline(market, code, 1) 包装
 	Quote func(ctx context.Context, market, code string) (*types.Quote, error)
-	// Knowledge 知识库检索片段：由 zhClient.KnowledgeSearch 包装（默认股票讨论 KB）
-	Knowledge func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error)
 	// Finance 财报指标（5年年报+最新期）；由 finance.GetResult 包装，可为 nil（跳过）
 	Finance func(ctx context.Context, code, market string) (*types.FinanceResult, error)
+	// Fundamental 基本面评分（四维+估值）；由 fundamental.Service.Score 包装，可为 nil（跳过）
+	Fundamental func(ctx context.Context, code, market string) (*types.FundamentalResult, error)
 	// ChatAgent 调用「AI 看山」对话（internal/agent.Chat 包装），SSE 事件经 sink 转发
 	ChatAgent func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error
 }
@@ -137,8 +136,8 @@ type Service struct {
 func New(store *Store, deps Deps) *Service { return &Service{store: store, deps: deps} }
 
 // SetSnapshot 实现 server.ChatProvider：一期 /api/ask 结束后写入结果快照
-func (s *Service) SetSnapshot(code string, stock types.StockInfo, sentiment *types.SentimentResult, analysis string) {
-	s.store.SetSnapshot(code, Snapshot{Stock: stock, Sentiment: sentiment, Analysis: analysis})
+func (s *Service) SetSnapshot(code string, stock types.StockInfo, analysis string) {
+	s.store.SetSnapshot(code, Snapshot{Stock: stock, Analysis: analysis})
 }
 
 // Reset 实现 server.ChatProvider：清空某股票会话
@@ -189,12 +188,14 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 				q.Price, q.Change, q.ChangePct, q.Open, q.High, q.Low, q.Volume)
 		}
 	}
-	// 情绪快照
-	if snap, ok := s.store.SnapshotOf(sess.Stock.Code); ok && snap.Sentiment != nil {
-		facts.Sentiment = formatSentiment(snap.Sentiment)
+	// 前次分析快照（不写回 sess，避免并发 data race；名称缺失用快照补）
+	if snap, ok := s.store.SnapshotOf(sess.Stock.Code); ok {
 		facts.PrevAnalysis = snap.Analysis
-		if sess.Stock.Name == "" {
-			sess.Stock = snap.Stock
+		if facts.StockName == "" {
+			facts.StockName = snap.Stock.Name
+		}
+		if facts.Market == "" {
+			facts.Market = snap.Stock.Market
 		}
 	}
 	// 财报指标摘要（5年年报+最新期，最小事实注入）
@@ -203,42 +204,37 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 			facts.Finance = formatFinance(res.Indicators)
 		}
 	}
-	// 知识库片段
-	if s.deps.Knowledge != nil {
-		query := facts.StockName
-		if query == "" {
-			query = facts.StockCode
-		}
-		if query != "" {
-			if items, err := s.deps.Knowledge(ctx, query+" 股票 投资 情绪", 3); err == nil {
-				facts.Knowledge = formatKnowledge(items)
-			}
+	// 基本面评分与估值（四维 + PE/PB/分位）
+	if s.deps.Fundamental != nil && facts.StockCode != "" {
+		if res, err := s.deps.Fundamental(ctx, facts.StockCode, facts.Market); err == nil && res != nil {
+			facts.Score = formatScore(res.Score)
+			facts.Valuation = formatValuation(res.Valuation)
 		}
 	}
 	return facts, nil
 }
 
-// formatSentiment 情绪面板 → 摘要文本
-func formatSentiment(r *types.SentimentResult) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("讨论热度 %d，样本 %d；看多 %.0f%%，看空 %.0f%%，中性 %.0f%%",
-		r.Heat, r.Sample, r.Ratio.Bull*100, r.Ratio.Bear*100, r.Ratio.Neutral*100))
-	if r.Score != nil {
-		b.WriteString(fmt.Sprintf("；参考强度 %d/10", *r.Score))
+// formatScore 四维评分 → 紧凑文本
+func formatScore(sc types.FundamentalScore) string {
+	return fmt.Sprintf("总分 %d（%s）：盈利 %d，成长 %d，财务健康 %d，估值 %d",
+		sc.Total, sc.Grade, sc.Profit, sc.Growth, sc.Health, sc.Valuat)
+}
+
+// formatValuation 估值 → 紧凑文本
+func formatValuation(v types.Valuation) string {
+	pe := "—"
+	if v.PE > 0 {
+		pe = fmt.Sprintf("%.2f", v.PE)
 	}
-	if r.Degraded {
-		b.WriteString("；数据降级（样本不足或搜索受限）")
+	pct := "无分位"
+	if v.PEEntPercent >= 0 {
+		pct = fmt.Sprintf("%.0f%%", v.PEEntPercent)
 	}
-	if len(r.Items) > 0 {
-		b.WriteString("；代表观点：")
-		for i, it := range r.Items {
-			if i >= 5 {
-				break
-			}
-			b.WriteString("「" + it.Title + "」")
-		}
+	pb := "—"
+	if v.PB > 0 {
+		pb = fmt.Sprintf("%.2f", v.PB)
 	}
-	return b.String()
+	return fmt.Sprintf("PE(TTM) %s（历史分位 %s），PB %s", pe, pct, pb)
 }
 
 // formatFinance 财务指标 → 紧凑文本（报告期 | 营收 | 净利 | ROE | 毛利率 | 负债率）
@@ -251,32 +247,6 @@ func formatFinance(items []types.FinancialIndicator) string {
 			it.EPS, it.ROE, it.GrossMargin, it.NetMargin, it.DebtRatio))
 	}
 	return b.String()
-}
-
-// formatKnowledge 知识库片段 → 截断文本（≤600 字）
-func formatKnowledge(items []types.KnowledgeItem) string {
-	var b strings.Builder
-	for _, it := range items {
-		if b.Len() > 600 {
-			break
-		}
-		if it.DocName != "" {
-			b.WriteString("· " + it.DocName)
-		}
-		if len(it.Content) > 0 && it.Content[0] != "" {
-			seg := it.Content[0]
-			if len([]rune(seg)) > 120 {
-				seg = string([]rune(seg)[:120]) + "…"
-			}
-			b.WriteString("：" + seg)
-		}
-		b.WriteString("\n")
-	}
-	out := b.String()
-	if len([]rune(out)) > 600 {
-		out = string([]rune(out)[:600]) + "…"
-	}
-	return out
 }
 
 func firstNonEmpty(a, b string) string {

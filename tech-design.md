@@ -1,5 +1,7 @@
 # 知乎股票情绪分析工具 — 技术设计
 
+> ⚠️ **已废弃（v2 定位转型）**：本文件是「知乎情绪分析」阶段的旧技术设计。产品已转型为**基本面分析**（见 [business-design.md](business-design.md) v2.0 与 [features/fundamental/SDD.md](features/fundamental/SDD.md)）。以下内容仅作历史存档。
+
 > 版本：v1.3
 > 日期：2026-08-16
 > 状态：初稿待评审

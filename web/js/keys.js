@@ -76,9 +76,8 @@
   window.saveKeys = async function () {
     clearKeyErr();
     const ds = document.getElementById('key-deepseek').value.trim();
-    const zh = document.getElementById('key-zhihu').value.trim();
-    if (!ds && !zh) {
-      showKeyErr('请至少填写一个密钥，或直接点击「跳过」使用默认密钥');
+    if (!ds) {
+      showKeyErr('请填写 DeepSeek API Key，或直接点击「跳过」使用默认密钥');
       return;
     }
     setSaving(true);
@@ -87,10 +86,8 @@
       const pkResp = await fetch('/api/config/pubkey');
       if (!pkResp.ok) throw new Error('获取加密公钥失败，请稍后重试');
       const { public_key: pem } = await pkResp.json();
-      // 2) 仅加密非空字段，避免无效密文
-      const payload = {};
-      if (ds) payload.deepseek_key_enc = await rsaEncrypt(pem, ds);
-      if (zh) payload.zhihu_secret_enc = await rsaEncrypt(pem, zh);
+      // 2) 公钥加密后提交
+      const payload = { deepseek_key_enc: await rsaEncrypt(pem, ds) };
       // 3) 提交（私钥仅在服务端，能解密的只有服务端）
       const resp = await fetch('/api/config/keys', {
         method: 'POST',
@@ -101,7 +98,7 @@
       if (!resp.ok) throw new Error(data.error || '保存失败，请稍后重试');
       localStorage.setItem(STORAGE_KEY, 'custom');
       hideKeyModal();
-      toast('密钥已加密保存并持久化，重启后继续生效');
+      toast('DeepSeek 密钥已加密保存并持久化，重启后继续生效');
     } catch (e) {
       showKeyErr(e.message || '保存失败，请稍后重试');
     } finally {

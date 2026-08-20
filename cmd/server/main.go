@@ -17,17 +17,17 @@ import (
 	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
 	"zhihudp/internal/finance"
+	"zhihudp/internal/fundamental"
 	"zhihudp/internal/hot"
 	"zhihudp/internal/keybox"
 	"zhihudp/internal/kline"
 	"zhihudp/internal/minute"
 	"zhihudp/internal/news"
-	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
+	"zhihudp/internal/valuation"
 	"zhihudp/internal/video"
-	"zhihudp/internal/zhihu"
 	"zhihudp/web"
 )
 
@@ -68,9 +68,15 @@ func main() {
 	}
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
-	zhClient := zhihu.New(cfg.Zhihu)
-	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient, configPath: *configPath}
-	deps := buildDeps(cfg, zhClient)
+	ks := &keyService{KeyBox: kb, cfg: cfg, configPath: *configPath}
+	// 基本面评分服务（财务东财 + 估值腾讯/东财分位）
+	fundSvc := fundamental.New(fundamental.Deps{
+		Finance:   finance.GetResult,
+		Valuation: valuation.Get,
+	})
+	fundProvider := &fundamentalProvider{svc: fundSvc}
+	deps := buildDeps(cfg)
+	deps.FundamentalScore = fundSvc.Score
 
 	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
 	chatSvc := chat.New(chat.NewStore(10), chat.Deps{
@@ -81,12 +87,10 @@ func main() {
 			}
 			return &k.Quote, nil
 		},
-		Knowledge: func(ctx context.Context, query string, limit int) ([]types.KnowledgeItem, error) {
-			return zhClient.KnowledgeSearch(ctx, query, []string{"7520243014858214186"}, limit)
-		},
 		Finance: func(ctx context.Context, code, market string) (*types.FinanceResult, error) {
 			return finance.GetResult(ctx, code, market)
 		},
+		Fundamental: fundSvc.Score,
 		ChatAgent: func(ctx context.Context, facts types.ChatFacts, history []types.ChatMessage, message string, sink func(types.Event) error) error {
 			return agent.Chat(ctx, facts, history, message, deps, sink)
 		},
@@ -119,14 +123,12 @@ func main() {
 		klineProviderFunc(kline.GetKline),
 		newsProviderFunc(news.GetNews),
 		hotProviderFunc{getHot: hot.GetHot, getSectorStocks: hot.GetSectorStocks},
-		knowledgeProviderFunc(func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
-			return zhClient.KnowledgeSearch(ctx, query, kbIDs, limit)
-		}),
 		ks,              // 密钥箱：公钥下发 + 加密密钥热更新
 		chatSvc,         // 二期：看山追问对话
 		fp,              // 财报解析（东财双源 + AI）
 		mp,              // 分时数据（东财主 + 腾讯兜底）
 		vp,              // 视频资讯（B站）
+		fundProvider,    // 基本面评分数据（GET /api/fundamental）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -154,12 +156,11 @@ func (f resolverFunc) Resolve(ctx context.Context, q string) (*types.StockInfo, 
 
 // 编译期断言：适配器满足 server 接口（house style）
 var (
-	_ server.Analyzer          = (analyzerFunc)(nil)
-	_ server.Resolver          = (resolverFunc)(nil)
-	_ server.KlineProvider     = (klineProviderFunc)(nil)
-	_ server.NewsProvider      = (newsProviderFunc)(nil)
-	_ server.HotProvider       = hotProviderFunc{}
-	_ server.KnowledgeProvider = (knowledgeProviderFunc)(nil)
+	_ server.Analyzer      = (analyzerFunc)(nil)
+	_ server.Resolver      = (resolverFunc)(nil)
+	_ server.KlineProvider = (klineProviderFunc)(nil)
+	_ server.NewsProvider  = (newsProviderFunc)(nil)
+	_ server.HotProvider   = hotProviderFunc{}
 )
 
 // klineProviderFunc 适配器：函数实现 → server.KlineProvider 接口
@@ -174,13 +175,6 @@ type newsProviderFunc func(ctx context.Context, keyword string, count int) ([]ty
 
 func (f newsProviderFunc) GetNews(ctx context.Context, keyword string, count int) ([]types.NewsItem, error) {
 	return f(ctx, keyword, count)
-}
-
-// knowledgeProviderFunc 适配器：函数实现 → server.KnowledgeProvider 接口
-type knowledgeProviderFunc func(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error)
-
-func (f knowledgeProviderFunc) KnowledgeSearch(ctx context.Context, query string, kbIDs []string, limit int) ([]types.KnowledgeItem, error) {
-	return f(ctx, query, kbIDs, limit)
 }
 
 // hotProviderFunc 适配器：函数实现 → server.HotProvider 接口
@@ -201,26 +195,21 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 type keyService struct {
 	*keybox.KeyBox
 	cfg        *config.Config
-	zhClient   *zhihu.Client
 	configPath string // config.yaml 路径（上传密钥后持久化密文用）
 }
 
-// UpdateKeys 应用用户提交的密钥（空值表示该项未填写，保留原密钥）
-func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
+// UpdateKeys 应用用户提交的 DeepSeek 密钥（空值保留原密钥）
+func (k *keyService) UpdateKeys(deepseekKey string) error {
 	if deepseekKey != "" {
-		k.cfg.DeepSeek.APIKey = deepseekKey
-	}
-	if zhihuSecret != "" {
-		k.cfg.Zhihu.AccessSecret = zhihuSecret
-		k.zhClient.UpdateKeys(zhihuSecret)
+		k.cfg.SetDeepSeekKey(deepseekKey) // 线程安全写入（agent 并发读取）
 	}
 	return nil
 }
 
 // PersistKeys 把加密后的密钥密文写回 config.yaml（只写 *_enc 字段，绝不落明文），
 // 重启后加载解密恢复 —— 仓库/配置泄露也只是密文。
-func (k *keyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error {
-	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc, zhihuSecretEnc)
+func (k *keyService) PersistKeys(deepseekKeyEnc string) error {
+	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc)
 }
 
 // financeProvider 财报服务适配器：数据（finance dao）+ AI 解析（agent）
@@ -258,6 +247,18 @@ func (v *videoProvider) GetVideos(ctx context.Context, keyword string, count int
 // 编译期断言：videoProvider 满足 server.VideoProvider
 var _ server.VideoProvider = (*videoProvider)(nil)
 
+// fundamentalProvider 适配器：fundamental.Service → server.FundamentalProvider
+type fundamentalProvider struct {
+	svc *fundamental.Service
+}
+
+func (f *fundamentalProvider) GetScore(ctx context.Context, code, market string) (*types.FundamentalResult, error) {
+	return f.svc.Score(ctx, code, market)
+}
+
+// 编译期断言：fundamentalProvider 满足 server.FundamentalProvider
+var _ server.FundamentalProvider = (*fundamentalProvider)(nil)
+
 // 编译期断言：minuteProvider 满足 server.MinuteProvider
 var _ server.MinuteProvider = (*minuteProvider)(nil)
 
@@ -267,21 +268,14 @@ var _ server.FinanceProvider = (*financeProvider)(nil)
 // 编译期断言：keyService 满足 server.KeyService
 var _ server.KeyService = (*keyService)(nil)
 
-// decryptEncKeys 用持久私钥解密密文密钥（config.yaml 的 *_enc 字段）并覆盖明文
+// decryptEncKeys 用持久私钥解密密文密钥（config.yaml 的 *_enc 字段）；环境变量已提供则优先 env
 func decryptEncKeys(cfg *config.Config, kb *keybox.KeyBox) error {
-	if cfg.DeepSeek.APIKeyEnc != "" {
+	if cfg.DeepSeek.APIKeyEnc != "" && cfg.DeepSeek.APIKey == "" {
 		plain, err := kb.DecryptOAEPBase64(cfg.DeepSeek.APIKeyEnc)
 		if err != nil {
 			return fmt.Errorf("解密 deepseek.api_key_enc 失败: %w", err)
 		}
 		cfg.DeepSeek.APIKey = string(plain)
-	}
-	if cfg.Zhihu.AccessSecretEnc != "" {
-		plain, err := kb.DecryptOAEPBase64(cfg.Zhihu.AccessSecretEnc)
-		if err != nil {
-			return fmt.Errorf("解密 zhihu.access_secret_enc 失败: %w", err)
-		}
-		cfg.Zhihu.AccessSecret = string(plain)
 	}
 	return nil
 }
@@ -314,35 +308,32 @@ func runKeyTool(cfg *config.Config, doKeygen, doPubkey bool, encValue, configPat
 			return strings.TrimSpace(s)
 		}
 		ds := readLine("DeepSeek API Key: ")
-		zh := readLine("知乎 Access Secret: ")
 		dsEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), ds)
-		zhEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), zh)
-		fmt.Println("\n=== 请把以下两行粘贴进 config.yaml（替换 deepseek 与 zhihu 下的对应字段）===")
+		fmt.Println("\n=== 请把以下粘贴进 config.yaml（deepseek 下的对应字段）===")
 		if dsEnc != "" {
 			fmt.Printf("deepseek:\n  api_key_enc: %q\n", dsEnc)
-		}
-		if zhEnc != "" {
-			fmt.Printf("zhihu:\n  access_secret_enc: %q\n", zhEnc)
 		}
 		fmt.Println("\n（config.yaml 也可留空 *_enc 字段，改用开屏弹窗上传）")
 	}
 }
 
 // buildDeps 组装 agent 依赖（业务层接线点）
-func buildDeps(cfg *config.Config, zhClient *zhihu.Client) agent.Deps {
+func buildDeps(cfg *config.Config) agent.Deps {
 	return agent.Deps{
 		ResolveStock: stock.Resolve,
-		AnalyzeSentiment: func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
-			return sentiment.Analyze(ctx, code, name, zhClient, cfg.DeepSeek)
-		},
-		// getter：每次调用读取最新配置（支持弹窗热更新密钥后立即生效）
-		DeepSeek: func() config.DeepSeekConfig { return cfg.DeepSeek },
+		// getter：每次调用读取最新配置（线程安全，支持弹窗热更新）
+		DeepSeek: cfg.GetDeepSeek,
 	}
 }
 
 // runCLI 命令行模式：跑一次分析，打印事件
 func runCLI(query string, cfg *config.Config) {
-	deps := buildDeps(cfg, zhihu.New(cfg.Zhihu))
+	fundSvc := fundamental.New(fundamental.Deps{
+		Finance:   finance.GetResult,
+		Valuation: valuation.Get,
+	})
+	deps := buildDeps(cfg)
+	deps.FundamentalScore = fundSvc.Score
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	err := agent.RunAnalysis(ctx, query, deps, func(ev types.Event) error {

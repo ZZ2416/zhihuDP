@@ -40,7 +40,7 @@ func (s *Server) handleFinance(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Printf("[finance] code=%s 失败: %v 耗时=%dms", code, err, elapsed)
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "数据获取失败，请稍后重试"})
 		return
 	}
 	log.Printf("[finance] code=%s 指标=%d 耗时=%dms", code, len(res.Indicators), elapsed)

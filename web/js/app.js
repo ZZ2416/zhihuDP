@@ -1,6 +1,8 @@
 /* app.js —— 应用入口：视图切换 / 搜索联想 / SSE 事件分发 / 分析流式状态 */
 let analysisText = '';
 let renderTimer = null;
+let gotFundamental = false; // 本次分析是否收到基本面评分
+let searchId = 0;            // 搜索序号（doSearch 重入保护）
 
 /* ---- 视图切换 ---- */
 function showDetail() {
@@ -50,6 +52,8 @@ async function doSearch() {
   const btn = $('search-btn');
   btn.disabled = true;
   hideSuggest();
+  if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+  const myId = ++searchId; // 本次搜索 token：后续续体校验仍是当前
 
   $('stock-head').innerHTML =
     '<span class="name">正在查询 ' + esc(stock) + '…</span>' +
@@ -70,8 +74,10 @@ async function doSearch() {
   $('video-body').innerHTML = '';
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
-  $('sentiment-body').innerHTML = '<span style="color:var(--faint)">正在分析…</span>';
-  $('analysis').innerHTML = '';
+  gotFundamental = false;
+  $('fundamental-card').classList.add('hidden');
+  $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
+  $('fundamental-analysis').innerHTML = '<span id="cursor" class="blink"></span>';
   analysisText = '';
   hideError();
   $('cursor').classList.remove('hidden');
@@ -84,22 +90,26 @@ async function doSearch() {
       showError(j.error || ('HTTP ' + resp.status));
       return;
     }
-    await readSSE(resp, handleEvent);
+    await readSSE(resp, (event, data) => handleEvent(event, data, myId)); // 传本次搜索 token（防旧流污染）
     flushAnalysis();
   } catch (e) {
     showError('网络异常：' + e.message);
   } finally {
     btn.disabled = false;
-    $('cursor').classList.add('hidden');
+    const c = $('cursor');
+    if (c) c.classList.add('hidden');
+    if (myId !== searchId) return; // 已被新搜索取代，丢弃
   }
 }
 
 /* ---- SSE 事件分发 ---- */
-function handleEvent(event, data) {
+function handleEvent(event, data, myId) {
+  if (myId === undefined) myId = searchId; // 兼容直接调用
   let d = {};
   try { d = data ? JSON.parse(data) : {}; } catch (e) {}
   switch (event) {
     case 'stock':
+      if (myId !== searchId) break;
       $('stock-head').innerHTML =
         '<span class="name">' + esc(d.name || '') + '</span>' +
         '<span class="code">' + esc(d.code || '') + '</span>' +
@@ -112,21 +122,30 @@ function handleEvent(event, data) {
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
       break;
-    case 'sentiment': renderSentiment(d); break;
-    case 'delta': appendDelta(d.text || ''); break;
-    case 'error': showError(d.message || '发生错误'); break;
+    case 'fundamental': if (myId !== searchId) break; gotFundamental = true; renderFundamental(d); break;
+    case 'delta': if (myId !== searchId) break; appendDelta(d.text || ''); break;
+    case 'done':
+      if (myId !== searchId) break;
+      if (!gotFundamental) {
+        $('fundamental-card').classList.remove('hidden');
+        $('fundamental-score').innerHTML = '<span style="color:var(--faint)">评分暂不可用（数据源异常）</span>';
+      }
+      break;
+    case 'error': if (myId === searchId) showError(d.message || '发生错误'); break;
     case 'done': break;
   }
 }
 
 /* ---- 行情（报价 + 日K，异步） ---- */
 async function fetchKline(code, market) {
+  const myId = searchId;
   try {
     const data = await apiKline(code, market, 60);
+    if (myId !== searchId) return; // 已切股/新搜索
     if (!data || !data.quote) { renderKlineError(); return; }
     renderQuote(data.quote);
     renderKline(data.candles || [], data.quote); // quote 用于首根涨跌幅计算
-  } catch (e) { renderKlineError(); }
+  } catch (e) { if (myId === searchId) renderKlineError(); }
 }
 
 /* ---- 相关资讯（辅助，失败静默隐藏） ---- */
@@ -141,11 +160,11 @@ async function fetchNews(name) {
 function appendDelta(text) {
   analysisText += text;
   if (renderTimer) return;
-  renderTimer = setTimeout(() => { renderTimer = null; $('analysis').innerHTML = renderMarkdown(analysisText); }, 80);
+  renderTimer = setTimeout(() => { renderTimer = null; $('fundamental-analysis').innerHTML = renderMarkdown(analysisText); }, 80);
 }
 function flushAnalysis() {
   if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
-  $('analysis').innerHTML = renderMarkdown(analysisText);
+  $('fundamental-analysis').innerHTML = renderMarkdown(analysisText);
 }
 
 /* ---- 初始化 ---- */
@@ -169,8 +188,6 @@ async function loadHomeHot() {
 }
 
 function retryHot() {
-  loadKnowledge();
-
   const label = $('hot-stocks-label'), back = $('hot-stocks-back');
   if (label) label.textContent = ''; if (back) back.classList.add('hidden');
   loadHomeHot();
@@ -187,7 +204,6 @@ function hotSearch(name) {
 window.addEventListener('load', () => {
   $('stock-input').focus();
   loadHomeHot();
-  loadKnowledge();
 });
 
 /* ---- 板块点击 → 成分股（复用热门股票卡片） ---- */
@@ -220,8 +236,3 @@ function setHotContext(isSector, name) {
   }
 }
 
-/* ---- 讨论文章（知识库搜索）加载 ---- */
-async function loadKnowledge() {
-  const items = await apiKnowledge('股票', 10).catch(() => null);
-  if (items && items.length) renderKnowledge(items);
-}

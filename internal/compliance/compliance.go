@@ -45,7 +45,7 @@ func FilterFinal(text string) string {
 	}
 	out := strings.Join(kept, "")
 	if strings.TrimSpace(out) == "" {
-		return "当前分析内容暂不可用，请查看上方情绪面板数据。"
+		return "当前分析内容暂不可用，请查看上方基本面数据。"
 	}
 	return out
 }

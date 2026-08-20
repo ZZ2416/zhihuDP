@@ -1,6 +1,12 @@
-/* markdown.js —— AI 分析文本的轻量 markdown 渲染（标题/加粗/列表/链接/分割线） */
-function mdInline(s) {
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+/* markdown.js —— AI 文本的轻量 markdown 渲染（标题/加粗/列表/链接/分割线）
+ * 安全：先整体 HTML 转义再套 markdown 变换（防存储型 XSS）；链接协议白名单 http/https */
+function mdInline(raw) {
+  let s = esc(raw); // 先转义，markdown 标记（** [] # - 等）不受影响
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, href) => {
+    const u = href.trim();
+    if (!/^https?:\/\//i.test(u)) return txt; // 非 http(s) 链接按纯文本处理
+    return '<a href="' + u + '" target="_blank" rel="noopener">' + txt + '</a>';
+  });
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
   return s;

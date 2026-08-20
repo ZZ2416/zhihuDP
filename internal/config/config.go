@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -23,15 +24,6 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	}
 	*d = Duration(dur)
 	return nil
-}
-
-// ZhihuConfig 知乎开放平台配置
-type ZhihuConfig struct {
-	AccessSecret    string `yaml:"access_secret"`     // 必填：知乎 Bearer token（明文，与 enc 二选一）
-	AccessSecretEnc string `yaml:"access_secret_enc"` // 可选：RSA 公钥加密后的密文（存在时优先，解密覆盖）
-	OpenAPIBaseURL  string `yaml:"openapi_base_url"`  // 默认 https://developer.zhihu.com
-	SearchURL       string `yaml:"zhihu_search_url"`  // 可选：完整 endpoint，优先级最高
-	KnowledgeBaseID string `yaml:"knowledge_base_id"` // 可选：知识库搜索用（股票讨论知识库）
 }
 
 // DeepSeekConfig DeepSeek 模型配置
@@ -60,11 +52,25 @@ type MediaConfig struct {
 
 // Config 应用配置
 type Config struct {
-	Zhihu    ZhihuConfig    `yaml:"zhihu"`
+	mu       sync.RWMutex   // 保护 DeepSeek 配置热更新（密钥弹窗写入 vs agent 读取）
 	DeepSeek DeepSeekConfig `yaml:"deepseek"`
 	KeyBox   KeyBoxConfig   `yaml:"keybox"`
 	Media    MediaConfig    `yaml:"media"`
 	Server   ServerConfig   `yaml:"server"`
+}
+
+// GetDeepSeek 线程安全读取 DeepSeek 配置快照
+func (c *Config) GetDeepSeek() DeepSeekConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.DeepSeek
+}
+
+// SetDeepSeekKey 线程安全更新 DeepSeek API Key（密钥弹窗热更新）
+func (c *Config) SetDeepSeekKey(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.DeepSeek.APIKey = key
 }
 
 // defaultKeyBoxDir 默认私钥目录：$HOME/.zhihudp
@@ -78,7 +84,6 @@ func defaultKeyBoxDir() string {
 
 func defaultConfig() *Config {
 	c := &Config{}
-	c.Zhihu.OpenAPIBaseURL = "https://developer.zhihu.com"
 	c.DeepSeek.BaseURL = "https://api.deepseek.com"
 	c.DeepSeek.Timeout = Duration(120 * time.Second)
 	c.KeyBox.PrivateKey = defaultKeyBoxDir() + "/zhihudp_private.pem"
@@ -109,16 +114,10 @@ func Load(path string) (*Config, error) {
 			*dst = v
 		}
 	}
-	applyEnv("ZHIHU_ACCESS_SECRET", &cfg.Zhihu.AccessSecret)
-	applyEnv("ZHIHU_OPENAPI_BASE_URL", &cfg.Zhihu.OpenAPIBaseURL)
-	applyEnv("ZHIHU_ZHIHU_SEARCH_URL", &cfg.Zhihu.SearchURL)
 	applyEnv("DEEPSEEK_API_KEY", &cfg.DeepSeek.APIKey)
 	applyEnv("DEEPSEEK_BASE_URL", &cfg.DeepSeek.BaseURL)
 
 	// 必填校验：只警告不 panic（调用时再明确报错）
-	if cfg.Zhihu.AccessSecret == "" {
-		fmt.Fprintln(os.Stderr, "[warn] 未配置 zhihu.access_secret（知乎 Bearer token），搜索接口将不可用")
-	}
 	if cfg.DeepSeek.APIKey == "" {
 		fmt.Fprintln(os.Stderr, "[warn] 未配置 deepseek.api_key，AI 分析将不可用")
 	}
@@ -138,16 +137,16 @@ func (c *Config) String() string {
 		return s[:2] + "****" + s[len(s)-2:]
 	}
 	keyMode := "明文"
-	if c.DeepSeek.APIKeyEnc != "" || c.Zhihu.AccessSecretEnc != "" {
+	if c.DeepSeek.APIKeyEnc != "" {
 		keyMode = "密文"
 	}
-	return fmt.Sprintf("Config{zhihu_secret:%s, deepseek_key:%s, key_mode:%s, base_url:%s, port:%d}",
-		mask(c.Zhihu.AccessSecret), mask(c.DeepSeek.APIKey), keyMode, c.DeepSeek.BaseURL, c.Server.Port)
+	return fmt.Sprintf("Config{deepseek_key:%s, key_mode:%s, base_url:%s, port:%d}",
+		mask(c.DeepSeek.APIKey), keyMode, c.DeepSeek.BaseURL, c.Server.Port)
 }
 
 // PersistEnc 把加密后的密钥密文写回 config.yaml（只写 enc 字段，绝不落明文）。
 // 用于开屏「上传密钥」后持久化：重启后加载解密恢复。
-func (c *Config) PersistEnc(path, deepseekEnc, zhihuEnc string) error {
+func (c *Config) PersistEnc(path, deepseekEnc string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -165,9 +164,6 @@ func (c *Config) PersistEnc(path, deepseekEnc, zhihuEnc string) error {
 	raw = ensureMap(raw)
 	if deepseekEnc != "" {
 		setNested(raw, []string{"deepseek", "api_key_enc"}, deepseekEnc)
-	}
-	if zhihuEnc != "" {
-		setNested(raw, []string{"zhihu", "access_secret_enc"}, zhihuEnc)
 	}
 	out, err := yaml.Marshal(raw)
 	if err != nil {

@@ -201,16 +201,22 @@ async function refreshMinute() {
 async function switchKline(mode) {
   const dayBtn = $('tab-day'), minBtn = $('tab-minute');
   if (mode === 'minute') {
+    const code = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
+    const market = $('stock-head') ? ($('stock-head').querySelector('.market') || {}).textContent : '';
+    if (!code) { // 尚无股票：回退日K tab，不切换
+      minBtn.classList.remove('active');
+      dayBtn.classList.add('active');
+      return;
+    }
     dayBtn.classList.remove('active');
     minBtn.classList.add('active');
     startMinuteRefresh();
     if (!minuteCache) {
-      const code = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
-      const market = $('stock-head') ? ($('stock-head').querySelector('.market') || {}).textContent : '';
-      if (!code) return;
       $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">加载分时数据…</div>';
       try {
         const data = await apiMinute(code, market);
+        const curCode = $('stock-head') ? ($('stock-head').querySelector('.code') || {}).textContent : '';
+        if (curCode !== code) return; // 已切股，丢弃旧响应
         if (!data || !data.points || !data.points.length) { $('kline-chart').innerHTML = '<div class="degraded" style="margin-top:12px">暂无分时数据</div>'; return; }
         minuteCache = { code, market, data };
         renderMinute(data);
