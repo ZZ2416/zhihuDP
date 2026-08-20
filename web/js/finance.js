@@ -1,6 +1,4 @@
 /* finance.js —— 财报解析：指标表格（5 年年报）+ AI 解析（SSE 流式，自动触发） */
-let finAnalysisTimer = null;
-
 /* 财务指标行定义：label + 取值函数 + 百分比格式 */
 const FIN_ROWS = [
   ['营业总收入（亿）', it => it.revenue, 1],

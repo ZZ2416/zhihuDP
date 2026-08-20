@@ -25,7 +25,6 @@ func (s *Server) handlePubKey(w http.ResponseWriter, r *http.Request) {
 // updateKeysRequest 前端加密提交的密钥（base64 RSA-OAEP 密文，字段为空表示该项跳过）
 type updateKeysRequest struct {
 	DeepseekKey string `json:"deepseek_key_enc"` // 加密的 DeepSeek API Key
-	ZhihuSecret string `json:"zhihu_secret_enc"` // 加密的知乎 Access Secret
 }
 
 // handleUpdateKeys POST /api/config/keys

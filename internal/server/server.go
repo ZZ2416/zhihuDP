@@ -31,6 +31,9 @@ func NewQuota(limit int) *QuotaStore {
 	return &QuotaStore{tokens: map[string]int{}, limit: limit}
 }
 
+// quotaMaxTokens tokens map 上限（防内存无限增长）
+const quotaMaxTokens = 10000
+
 // Consume 扣减一次调用；返回 (剩余次数, 是否允许)。false = 超限。
 func (q *QuotaStore) Consume(token string) (int, bool) {
 	q.mu.Lock()
@@ -47,6 +50,14 @@ func (q *QuotaStore) Consume(token string) (int, bool) {
 	}
 	remain--
 	q.tokens[token] = remain
+	// 上限保护：超限时清理已用尽（0 余额）的条目，防内存无限增长
+	if len(q.tokens) > quotaMaxTokens {
+		for t, r := range q.tokens {
+			if r <= 0 {
+				delete(q.tokens, t)
+			}
+		}
+	}
 	return remain, true
 }
 

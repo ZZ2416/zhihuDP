@@ -3,7 +3,9 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
@@ -57,7 +59,10 @@ func Chat(ctx context.Context, facts types.ChatFacts, history []types.ChatMessag
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
-			break // io.EOF 或上下文取消：正常结束
+			if !errors.Is(err, io.EOF) && ctx.Err() == nil {
+				_ = sink(types.Event{Type: "error", Data: map[string]string{"message": "流式输出中断: " + err.Error()}})
+			}
+			break
 		}
 		text := msg.Content
 		if text == "" {
@@ -73,13 +78,8 @@ func Chat(ctx context.Context, facts types.ChatFacts, history []types.ChatMessag
 		}
 	}
 
-	// 收尾：整段句级过滤，若被删空给兜底文案
-	finalText := compliance.FilterFinal(final.String())
-	if finalText != final.String() {
-		if err := sink(types.Event{Type: "delta", Data: map[string]string{"text": finalText}}); err != nil {
-			return err
-		}
-	}
+	// 收尾：整段句级过滤（差异不再追加 delta，避免前端增量重复；块级过滤已覆盖绝大多数）
+	_ = compliance.FilterFinal(final.String())
 	return nil
 }
 

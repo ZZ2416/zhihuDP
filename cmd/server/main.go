@@ -268,9 +268,9 @@ var _ server.FinanceProvider = (*financeProvider)(nil)
 // 编译期断言：keyService 满足 server.KeyService
 var _ server.KeyService = (*keyService)(nil)
 
-// decryptEncKeys 用持久私钥解密密文密钥（config.yaml 的 *_enc 字段）并覆盖明文
+// decryptEncKeys 用持久私钥解密密文密钥（config.yaml 的 *_enc 字段）；环境变量已提供则优先 env
 func decryptEncKeys(cfg *config.Config, kb *keybox.KeyBox) error {
-	if cfg.DeepSeek.APIKeyEnc != "" {
+	if cfg.DeepSeek.APIKeyEnc != "" && cfg.DeepSeek.APIKey == "" {
 		plain, err := kb.DecryptOAEPBase64(cfg.DeepSeek.APIKeyEnc)
 		if err != nil {
 			return fmt.Errorf("解密 deepseek.api_key_enc 失败: %w", err)
@@ -308,15 +308,10 @@ func runKeyTool(cfg *config.Config, doKeygen, doPubkey bool, encValue, configPat
 			return strings.TrimSpace(s)
 		}
 		ds := readLine("DeepSeek API Key: ")
-		zh := readLine("知乎 Access Secret: ")
 		dsEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), ds)
-		zhEnc, _ := keybox.EncryptOAEPBase64(kb.PublicKeyPEM(), zh)
-		fmt.Println("\n=== 请把以下两行粘贴进 config.yaml（替换 deepseek 与 zhihu 下的对应字段）===")
+		fmt.Println("\n=== 请把以下粘贴进 config.yaml（deepseek 下的对应字段）===")
 		if dsEnc != "" {
 			fmt.Printf("deepseek:\n  api_key_enc: %q\n", dsEnc)
-		}
-		if zhEnc != "" {
-			fmt.Printf("zhihu:\n  access_secret_enc: %q\n", zhEnc)
 		}
 		fmt.Println("\n（config.yaml 也可留空 *_enc 字段，改用开屏弹窗上传）")
 	}

@@ -131,7 +131,7 @@ function handleEvent(event, data, myId) {
         $('fundamental-score').innerHTML = '<span style="color:var(--faint)">评分暂不可用（数据源异常）</span>';
       }
       break;
-    case 'error': showError(d.message || '发生错误'); break;
+    case 'error': if (myId === searchId) showError(d.message || '发生错误'); break;
     case 'done': break;
   }
 }

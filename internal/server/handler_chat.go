@@ -48,6 +48,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Stock = strings.TrimSpace(req.Stock)
+	req.Market = strings.TrimSpace(req.Market)
 	req.Message = strings.TrimSpace(req.Message)
 	if req.Stock == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "stock 不能为空"})

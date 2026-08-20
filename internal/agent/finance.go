@@ -3,7 +3,9 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
@@ -47,6 +49,9 @@ func AnalyzeFinance(ctx context.Context, code, name string, indicators []types.F
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
+			if !errors.Is(err, io.EOF) && ctx.Err() == nil {
+				_ = sink(types.Event{Type: "error", Data: map[string]string{"message": "流式输出中断: " + err.Error()}})
+			}
 			break
 		}
 		text := compliance.Filter(msg.Content) // 流式增量过滤
@@ -58,13 +63,8 @@ func AnalyzeFinance(ctx context.Context, code, name string, indicators []types.F
 			return err
 		}
 	}
-	// 收尾整段过滤
-	finalText := compliance.FilterFinal(final.String())
-	if finalText != final.String() {
-		if err := sink(types.Event{Type: "delta", Data: map[string]string{"text": finalText}}); err != nil {
-			return err
-		}
-	}
+	// 收尾整段过滤（差异不追加，防前端增量重复）
+	_ = compliance.FilterFinal(final.String())
 	return nil
 }
 
