@@ -75,8 +75,8 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	_ = writeSSE(w, "done", struct{}{})
 	flusher.Flush()
 
-	// 保存分析快照（最终分析文本），供基本面问答使用
-	if s.chatProvider != nil && curStock.Code != "" {
+	// 保存分析快照（最终分析文本），供基本面问答使用；空文本不覆盖旧快照
+	if s.chatProvider != nil && curStock.Code != "" && analysisText.Len() > 0 {
 		s.chatProvider.SetSnapshot(curStock.Code, curStock, analysisText.String())
 	}
 }
