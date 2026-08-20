@@ -77,6 +77,8 @@ func marketPrefix(market, code string) string {
 		return "SZ"
 	case strings.Contains(market, "北"):
 		return "BJ"
+	case strings.HasPrefix(code, "92"):
+		return "BJ" // 北交所新号段
 	}
 	if code != "" {
 		switch code[0] {

@@ -31,7 +31,7 @@ func (s *Server) handleResolve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "未找到该股票，请检查名称/代码"})
 	case err != nil:
 		log.Printf("[resolve] q=%q 失败: %v 耗时=%dms", q, err, elapsed)
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "数据获取失败，请稍后重试"})
 	default:
 		log.Printf("[resolve] q=%q -> %s %s(%s) 耗时=%dms", q, info.Name, info.Code, info.Market, elapsed)
 		writeJSON(w, http.StatusOK, info)

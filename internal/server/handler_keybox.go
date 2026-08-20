@@ -50,8 +50,10 @@ func (s *Server) handleUpdateKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 持久化密文到 config.yaml（只写 *_enc 字段）：重启后加载解密恢复，仓库/配置无明文
+	persisted := true
 	if err := s.keyService.PersistKeys(req.DeepseekKey); err != nil {
 		log.Printf("[keybox] 密文持久化失败: %v（密钥已热更新，重启后需重新上传）", err)
+		persisted = false
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": true})
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "persisted": persisted})
 }

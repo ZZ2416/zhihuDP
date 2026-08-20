@@ -38,7 +38,7 @@ func (s *Server) handleKline(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("[kline] code=%s market=%s 失败: %v 耗时=%dms", code, market, err, elapsed)
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "数据获取失败，请稍后重试"})
 		return
 	}
 	log.Printf("[kline] code=%s market=%s candles=%d 耗时=%dms", code, market, len(kl.Candles), elapsed)

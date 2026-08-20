@@ -2,11 +2,14 @@
  * 每个股票独立会话（服务端按 stock 隔离）；发送追问走 POST /api/chat SSE 流式。 */
 let chatStock = null; // {code, market, name} 当前对话绑定的股票
 let chatBusy = false;
+let chatAbort = null; // 在途 chat 请求的 AbortController（切股时中止）
 
 /* 切股/新查询时重置对话区（会话本身由服务端按 code 隔离） */
 function resetChat(stock) {
+  if (chatAbort) { chatAbort.abort(); chatAbort = null; } // 中止在途 chat 流（防白耗 LLM/写脱离 DOM）
   chatStock = stock || null;
   chatBusy = false;
+  $('chat-send').disabled = false;
   $('chat-msgs').innerHTML = '';
   $('chat-card').classList.remove('hidden');
   $('chat-input').value = '';
@@ -61,7 +64,9 @@ async function sendChat() {
 
   const thinking = appendChatMsg('assistant', '看山正在思考…', true);
   try {
-    const resp = await apiChat(chatStock.code, chatStock.market, msg);
+    const ac = new AbortController();
+    chatAbort = ac;
+    const resp = await apiChat(chatStock.code, chatStock.market, msg, ac.signal);
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
       throw new Error(j.error || ('HTTP ' + resp.status));
@@ -79,6 +84,7 @@ async function sendChat() {
   } catch (e) {
     thinking.textContent = '😥 网络异常：' + e.message + '（点击「发送」可重试）';
   } finally {
+    chatAbort = null;
     chatBusy = false;
     $('chat-send').disabled = false;
     $('chat-input').focus();

@@ -173,7 +173,7 @@ func secidSuffix(market, code string) string {
 	if strings.Contains(market, "沪") || (code != "" && (code[0] == '6' || code[0] == '9')) {
 		return "SH"
 	}
-	if strings.Contains(market, "北") || (code != "" && (code[0] == '4' || code[0] == '8')) {
+	if strings.Contains(market, "北") || (code != "" && (code[0] == '4' || code[0] == '8' || strings.HasPrefix(code, "92"))) {
 		return "BJ"
 	}
 	return "SZ"
