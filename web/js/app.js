@@ -90,7 +90,7 @@ async function doSearch() {
       showError(j.error || ('HTTP ' + resp.status));
       return;
     }
-    await readSSE(resp, handleEvent);
+    await readSSE(resp, (event, data) => handleEvent(event, data, myId)); // 传本次搜索 token（防旧流污染）
     flushAnalysis();
   } catch (e) {
     showError('网络异常：' + e.message);
@@ -103,8 +103,8 @@ async function doSearch() {
 }
 
 /* ---- SSE 事件分发 ---- */
-function handleEvent(event, data) {
-  let myId = searchId;
+function handleEvent(event, data, myId) {
+  if (myId === undefined) myId = searchId; // 兼容直接调用
   let d = {};
   try { d = data ? JSON.parse(data) : {}; } catch (e) {}
   switch (event) {

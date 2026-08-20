@@ -174,6 +174,8 @@ zhihuDP/
 | [features/finance/SRS.md](features/finance/SRS.md) | 财报解析需求规格 |
 | [features/finance/SDD.md](features/finance/SDD.md) | 财报解析技术设计 |
 | [features/minute/SRS.md](features/minute/SRS.md) | 分时图需求规格 |
+| [features/fundamental/设计方案.md](features/fundamental/设计方案.md) | 基本面分析设计方案（四维评分/估值分位） |
+| [features/fundamental/SDD.md](features/fundamental/SDD.md) | 基本面分析技术设计（v0.4 含实现差异） |
 | [features/minute/SDD.md](features/minute/SDD.md) | 分时图技术设计 |
 | [features/video/SRS.md](features/video/SRS.md) | B站相关视频需求规格 |
 | [features/video/SDD.md](features/video/SDD.md) | B站相关视频技术设计 |
