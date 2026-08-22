@@ -74,3 +74,10 @@ async function apiVideo(keyword, count) {
   if (!resp.ok) return null;
   return resp.json();
 }
+
+async function apiChain(code, market) {
+  return fetch('/api/chain', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, market: market || '' })
+  });
+}

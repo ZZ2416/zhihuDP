@@ -75,6 +75,9 @@ async function doSearch() {
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
   gotFundamental = false;
+  $('chain-card').classList.add('hidden');
+  $('chain-body').innerHTML = '';
+  $('chain-companies').innerHTML = '';
   $('fundamental-card').classList.add('hidden');
   $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
   $('fundamental-analysis').innerHTML = '<span id="cursor" class="blink"></span>';
@@ -118,6 +121,7 @@ function handleEvent(event, data, myId) {
       fetchKline(d.code, d.market); // 异步拉行情，不阻塞 SSE 流
       fetchNews(d.name);            // 异步拉相关资讯（辅助，失败静默）
       loadFinance(d.code, d.market); // 财报解析：指标 + AI 解析（东财双源）
+      loadChain(d.code, d.market, searchId); // 产业链图谱（AI 生成，带重入保护）
       loadVideo(d.name);             // 相关视频（B站，封面卡片横滑）
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话

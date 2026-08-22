@@ -147,6 +147,7 @@ type Server struct {
 	minute        MinuteProvider
 	video         VideoProvider
 	fundamental   FundamentalProvider
+	chainProvider ChainProvider
 	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
 	mediaDir      string      // 媒体目录（/media/ 播放）；空 = 禁用
 	mediaToken    string      // 媒体访问令牌；空/不匹配 → 403（防未授权访问与转发）
@@ -154,7 +155,7 @@ type Server struct {
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, fundamental FundamentalProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, fundamental FundamentalProvider, chainProvider ChainProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -167,6 +168,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		minute:        minute,
 		video:         video,
 		fundamental:   fundamental,
+		chainProvider: chainProvider,
 		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		mediaDir:      mediaDir,
 		mediaToken:    mediaToken,
@@ -190,6 +192,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/finance/analyze", s.handleFinanceAnalyze) // 财报 AI 解析（SSE，计配额）
 	mux.HandleFunc("GET /api/minute", s.handleMinute)                   // 分时数据（当日）
 	mux.HandleFunc("GET /api/fundamental", s.handleFundamental)         // 基本面评分数据
+	mux.HandleFunc("POST /api/chain", s.handleChain)                    // 产业链图谱（AI 生成，计配额）
 	mux.HandleFunc("GET /api/video", s.handleVideo)                     // 视频资讯（B站，按时间/播放量）
 	// 媒体播放（抖音式禁止转载）：token 校验 + 受保护播放页 + 视频流（Range 支持）
 	if s.mediaDir != "" && s.mediaToken != "" {
