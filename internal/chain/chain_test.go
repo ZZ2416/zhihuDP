@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"zhihudp/internal/agent"
 	"zhihudp/internal/types"
 )
 
@@ -61,11 +60,4 @@ func TestValidateCode(t *testing.T) {
 			t.Errorf("ValidateCode(%q)=%v want %v", c.code, got, c.want)
 		}
 	}
-}
-
-// agent.parseChain 间接测试：通过 agent 包导出？用独立小测模拟同结构
-func TestParseChainJSON(t *testing.T) {
-	// 直接测 agent 包内 parseChain 需在 agent 包——这里验证 JSON 结构解析思路（用本地解析断言字段）
-	// 真实 parseChain 测试在 internal/agent/chain_test.go 更合适；此处留结构断言占位
-	_ = agent.GenerateChain // 引用避免 unused（实际测试在 agent 包）
 }

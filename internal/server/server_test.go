@@ -85,6 +85,15 @@ func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink f
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
 }
 
+// fakeChainProvider 产业链桩
+type fakeChainProvider struct{}
+
+func (fakeChainProvider) Generate(_ context.Context, code, _ string) (*types.ChainResult, error) {
+	return &types.ChainResult{Industry: "测试产业链", Nodes: []types.ChainNode{
+		{ID: "n1", Name: "上游-测试", Stage: "上游", Desc: "测试"},
+	}}, nil
+}
+
 // fakeFundamentalProvider 基本面评分桩
 type fakeFundamentalProvider struct{}
 

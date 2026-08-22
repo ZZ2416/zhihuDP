@@ -1,13 +1,15 @@
 /* chain.js —— 产业链图谱：AI 生成 JSON → 三列 SVG 渲染 + 节点交互（点击看同类型厂商） */
 let chainNodes = null; // 缓存当前产业链（切换股票时重置）
+let chainReq = null;    // 当前请求的 {code, market}（重试用）
 
-async function loadChain(code, market) {
+async function loadChain(code, market, myId) {
   const card = $('chain-card');
   if (!card) return;
   card.classList.remove('hidden');
   $('chain-body').innerHTML = '<span class="fin-loading">AI 正在绘制产业链…</span>';
   $('chain-companies').innerHTML = '';
   chainNodes = null;
+  chainReq = { code, market };
   try {
     const resp = await apiChain(code, market);
     if (!resp.ok) {
@@ -15,17 +17,19 @@ async function loadChain(code, market) {
       throw new Error(j.error || ('HTTP ' + resp.status));
     }
     const res = await resp.json();
+    if (typeof myId === 'number' && myId !== searchId) return; // 已被新搜索取代
     if (!res.nodes || !res.nodes.length) throw new Error('产业链生成失败');
     chainNodes = res;
     renderChain(res);
   } catch (e) {
+    if (typeof myId === 'number' && myId !== searchId) return;
     $('chain-body').innerHTML = '<div class="degraded" style="margin-top:6px">产业链生成失败：' + esc(e.message) +
       ' <a style="cursor:pointer" onclick="retryChain()">重试</a></div>';
   }
 }
 
 function retryChain() {
-  if (curStock) loadChain(curStock.code, curStock.market);
+  if (chainReq) loadChain(chainReq.code, chainReq.market);
 }
 
 /* 三列 SVG 渲染：上游 | 中游 | 下游 */
@@ -66,7 +70,7 @@ function renderChain(res) {
   // 节点
   for (const n of res.nodes) {
     const x = colX(n.stage), y = yPos[n.id];
-    svg += '<g class="chain-node" data-id="' + n.id + '" transform="translate(' + (x - colW / 2 + 14) + ',' + y + ')">' +
+    svg += '<g class="chain-node" data-id="' + esc(n.id) + '" transform="translate(' + (x - colW / 2 + 14) + ',' + y + ')">' +
       '<rect x="0" y="0" width="' + (colW - 28) + '" height="' + nodeH + '" rx="9" fill="var(--card)" stroke="var(--border)" stroke-width="1.2"/>' +
       '<text x="' + (colW - 28) / 2 + '" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">' + esc(n.name) + '</text>' +
       '<text x="' + (colW - 28) / 2 + '" y="40" text-anchor="middle" font-size="11" fill="var(--faint)">' + esc(n.desc || '') + '</text>' +

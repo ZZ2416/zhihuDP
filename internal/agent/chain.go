@@ -57,7 +57,7 @@ func GenerateChain(ctx context.Context, name, code string, deps Deps) (*types.Ch
 	if lastErr == nil {
 		lastErr = fmt.Errorf("生成结果为空")
 	}
-	return nil, lastErr
+	return nil, fmt.Errorf("产业链生成失败（重试后仍失败）: %w", lastErr)
 }
 
 // parseChain 解析并校验 LLM 输出的产业链 JSON
@@ -85,10 +85,22 @@ func parseChain(raw string) (*types.ChainResult, error) {
 	}
 	ids := map[string]bool{}
 	stageOK := map[string]bool{"上游": true, "中游": true, "下游": true}
+	idOK := func(id string) bool {
+		if id == "" {
+			return false
+		}
+		for _, r := range id {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+				return false
+			}
+		}
+		return true
+	}
 	nodes := res.Nodes[:0]
 	for _, n := range res.Nodes {
 		n.ID = strings.TrimSpace(n.ID)
-		if n.ID == "" || !stageOK[n.Stage] {
+		n.Stage = strings.TrimSpace(n.Stage)
+		if !idOK(n.ID) || !stageOK[n.Stage] {
 			continue
 		}
 		if ids[n.ID] {
@@ -98,10 +110,13 @@ func parseChain(raw string) (*types.ChainResult, error) {
 		nodes = append(nodes, n)
 	}
 	res.Nodes = nodes
-	// edges 端点必须存在
+	if len(res.Nodes) == 0 {
+		return nil, fmt.Errorf("产业链 nodes 全部无效") // 触发外层重试
+	}
+	// edges 端点必须存在且非自环
 	edges := res.Edges[:0]
 	for _, e := range res.Edges {
-		if ids[e.From] && ids[e.To] {
+		if ids[e.From] && ids[e.To] && e.From != e.To {
 			edges = append(edges, e)
 		}
 	}

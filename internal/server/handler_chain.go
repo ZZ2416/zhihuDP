@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -52,7 +53,11 @@ func (s *Server) handleChain(w http.ResponseWriter, r *http.Request) {
 	elapsed := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Printf("[chain] code=%s 失败: %v 耗时=%dms", req.Code, err, elapsed)
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "产业链生成失败，请稍后重试"})
+		if errors.Is(err, chain.ErrLLMFailed) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "产业链生成失败，请稍后重试"})
+		} else {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "产业链服务暂时不可用"})
+		}
 		return
 	}
 	log.Printf("[chain] code=%s 环节=%d 厂商=%d 耗时=%dms", req.Code, len(res.Nodes), len(res.Companies), elapsed)

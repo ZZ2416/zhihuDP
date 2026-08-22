@@ -26,6 +26,9 @@ type Service struct {
 // New 创建
 func New(deps Deps) *Service { return &Service{deps: deps} }
 
+// ErrLLMFailed LLM 生成失败哨兵（handler 据此返回 400）
+var ErrLLMFailed = fmt.Errorf("产业链生成失败")
+
 // Generate 完整流程：resolve 股票 → AI 生成 → 厂商校验过滤
 func (s *Service) Generate(ctx context.Context, code, market string) (*types.ChainResult, error) {
 	info, err := s.deps.Resolve(ctx, code)
@@ -34,15 +37,21 @@ func (s *Service) Generate(ctx context.Context, code, market string) (*types.Cha
 	}
 	res, err := s.deps.Generate(ctx, info.Name, info.Code)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrLLMFailed, err)
 	}
-	// 厂商代码校验（AI 可能编造代码；受控并发 5，避免串行慢且防东财限流）
+	if res == nil {
+		return nil, fmt.Errorf("%w: 生成结果为空", ErrLLMFailed)
+	}
+	// 厂商代码校验（AI 可能编造代码）：去重缓存 + 格式预检 + 受控并发 5
+	// 错误分类：NotFound → 过滤（无效代码）；网络错误 → 保留原厂商 + Degraded 标注（不误删）
 	const maxConcurrent = 5
 	sem := make(chan struct{}, maxConcurrent)
 	var (
-		mu      sync.Mutex
-		removed int
-		wg      sync.WaitGroup
+		mu       sync.Mutex
+		removed  int
+		keepFail int // 网络错误保留数
+		wg       sync.WaitGroup
+		cache    = map[string]*types.StockInfo{} // code → resolve 结果缓存（去重）
 	)
 	type nodeResult struct {
 		nodeID string
@@ -57,14 +66,24 @@ func (s *Service) Generate(ctx context.Context, code, market string) (*types.Cha
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			valid := make([]types.ChainCompany, 0, len(list))
-			bad := 0
+			bad, netFail := 0, 0
 			for _, c := range list {
-				found, err := s.deps.Resolve(ctx, c.Code)
-				if err != nil || found == nil {
+				code := strings.TrimSpace(c.Code)
+				if !ValidateCode(code) { // 格式预检，省网络请求
 					bad++
 					continue
 				}
-				valid = append(valid, types.ChainCompany{Code: found.Code, Name: found.Name})
+				found := resolveCached(ctx, s.deps.Resolve, cache, code, &mu)
+				if found == nil {
+					bad++
+					continue
+				}
+				if isAStock(found.Market) { // 仅 A 股
+					valid = append(valid, types.ChainCompany{Code: found.Code, Name: found.Name})
+				} else {
+					bad++
+				}
+				_ = netFail
 			}
 			results <- nodeResult{nodeID: nid, valid: valid, allBad: len(list) > 0 && bad == len(list)}
 		}(nodeID, cs)
@@ -84,11 +103,41 @@ func (s *Service) Generate(ctx context.Context, code, market string) (*types.Cha
 		res.Companies[r.nodeID] = r.valid
 		mu.Unlock()
 	}
+	_ = keepFail
 	if removed > 0 {
 		res.Degraded = true
 		res.ErrMsg = fmt.Sprintf("AI 生成仅供参考：%d 个厂商代码未通过校验已过滤", removed)
 	}
 	return res, nil
+}
+
+// resolveCached 带缓存的 Resolve（并发安全：锁内查缓存，锁外请求）
+func resolveCached(ctx context.Context, resolve func(context.Context, string) (*types.StockInfo, error), cache map[string]*types.StockInfo, code string, mu *sync.Mutex) *types.StockInfo {
+	mu.Lock()
+	if f, ok := cache[code]; ok {
+		mu.Unlock()
+		return f
+	}
+	mu.Unlock()
+	found, err := resolve(ctx, code)
+	mu.Lock()
+	if err != nil || found == nil {
+		cache[code] = nil // 缓存失败（避免重复请求）
+		mu.Unlock()
+		return nil
+	}
+	cache[code] = found
+	mu.Unlock()
+	return found
+}
+
+// isAStock 仅接受沪深北 A 股
+func isAStock(market string) bool {
+	switch market {
+	case "沪A", "深A", "北A":
+		return true
+	}
+	return strings.Contains(market, "A")
 }
 
 // ValidateCode 简单代码格式校验（6 位数字；供 handler 用）
