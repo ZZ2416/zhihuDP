@@ -53,5 +53,5 @@ EXTRA=""
 [[ -n "${ZHIHU_ACCESS_SECRET:-}" ]] && EXTRA="${EXTRA} ZHIHU_ACCESS_SECRET='${ZHIHU_ACCESS_SECRET}'"
 [[ -n "${APP_PORT:-}" ]] && EXTRA="${EXTRA} APP_PORT=${APP_PORT}"
 
-ssh -t "$SERVER" "APP_BIN=/tmp/zhihudp.bin ${EXTRA} bash /tmp/zhihudp-install.sh; rm -f /tmp/zhihudp.bin /tmp/zhihudp-install.sh"
+ssh -t "$SERVER" "sudo APP_BIN=/tmp/zhihudp.bin ${EXTRA} bash /tmp/zhihudp-install.sh && rm -f /tmp/zhihudp.bin /tmp/zhihudp-install.sh"
 info "完成。访问 http://<服务器公网IP>:${APP_PORT}"
