@@ -112,7 +112,9 @@ fi
 # ---------- 3. 获取代码并编译 ----------
 if [[ "$SKIP_BUILD" == "1" ]]; then
   info "使用预编译二进制: ${APP_BIN}"
-  cp "$APP_BIN" /tmp/zhihudp.bin
+  if [[ "$APP_BIN" != "/tmp/zhihudp.bin" ]]; then
+    cp "$APP_BIN" /tmp/zhihudp.bin
+  fi
 else
   BUILD_DIR="$(mktemp -d /tmp/zhihudp-build.XXXXXX)"
   trap 'rm -rf "$BUILD_DIR"' EXIT
