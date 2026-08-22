@@ -4,6 +4,17 @@
 > 起始日期：2026-08-16
 > 说明：与 git 提交一一对应；文档链与代码均记录于此。
 
+## 2026-08-22 · feature/emotion：产业链图谱并入情绪分支（8081）
+
+**合并 feature/chain → feature/emotion**（c18bc09）：8081 情绪版现同时具备**知乎情绪分析 + 基本面四维评分 + AI 生成产业链图谱**。
+
+- **产业链图谱**：`POST /api/chain`（ValidateCode 校验、配额、30s 超时、`ErrLLMFailed` 400/502 分流）
+  - `internal/agent/chain.go`：`GenerateChain` 严格 JSON 输出（6-10 环节 × 3-6 家真实 A 股厂商），重试 2 次 + markdown 围栏剥离 + 结构校验（stage/id 格式/edges 端点/companies 键/自环过滤）
+  - `internal/chain/chain.go`：厂商校验（去重缓存 + ValidateCode 预检 + 5 并发 + NotFound 过滤/网络错误保留 + 仅 A 股），返回标注"AI 生成仅供参考"
+  - 前端 `web/js/chain.js`：三列 SVG（上游|中游|下游、贝塞尔连线箭头）、节点点击看同类型厂商可跳查、`loadChain` 重入保护、data-id 转义
+- **合并残留修复**：`api.js` apiEmotionAnalyze 函数体恢复、`server_test.go` fakeEmotionProvider 桩、newTestServer 重复 return 合一
+- 验证：`go build/vet/test` 11 包全绿、`node --check` 全过；8081 实测 `/api/ask` 事件流 `stock → sentiment → fundamental → delta → done`，`/api/chain` 200
+
 ## 2026-08-16 · ui_premiu：开屏密钥配置（KeyBox，RSA 公私钥）
 
 **改回 banner 图用途**：`fc3e98b06dad3a2da7182d5514e2bd7e_r.jpg` 不再作顶栏背景，改为**开屏动画**主视觉；顶栏恢复纯主题色 + 毛玻璃。
