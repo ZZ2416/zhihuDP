@@ -29,6 +29,13 @@
 # =============================================================================
 set -euo pipefail
 
+C_RED='\033[0;31m'; C_GRN='\033[0;32m'; C_YLW='\033[1;33m'; C_NC='\033[0m'
+info() { echo -e "${C_GRN}[deploy]${C_NC} $*"; }
+warn() { echo -e "${C_YLW}[deploy]${C_NC} $*"; }
+fail() { echo -e "${C_RED}[deploy] 错误:${C_NC} $*" >&2; exit 1; }
+
+[[ $EUID -eq 0 ]] || fail "请用 root 或 sudo 执行本脚本"
+
 # ---------- 参数 ----------
 APP_SOURCE="${APP_SOURCE:-https://github.com/ZZ2416/zhihuDP.git}"
 GIT_BRANCH="${GIT_BRANCH:-}"
@@ -46,13 +53,6 @@ if [[ -f "$APP_BIN" && "${SKIP_BUILD_FORCE:-0}" != "1" ]]; then
   info "检测到预编译二进制 ${APP_BIN}，跳过 装Go/拉代码/编译 步骤"
   SKIP_BUILD=1
 fi
-
-C_RED='\033[0;31m'; C_GRN='\033[0;32m'; C_YLW='\033[1;33m'; C_NC='\033[0m'
-info() { echo -e "${C_GRN}[deploy]${C_NC} $*"; }
-warn() { echo -e "${C_YLW}[deploy]${C_NC} $*"; }
-fail() { echo -e "${C_RED}[deploy] 错误:${C_NC} $*" >&2; exit 1; }
-
-[[ $EUID -eq 0 ]] || fail "请用 root 或 sudo 执行本脚本"
 
 # ---------- 0. 系统检测 ----------
 OS_ID="$(. /etc/os-release 2>/dev/null && echo "${ID:-unknown}")"
