@@ -56,7 +56,7 @@ function renderChain(res) {
   // 连线（贝塞尔）
   svg += '<defs><marker id="chain-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="var(--faint)"/></marker></defs>';
   for (const e of res.edges) {
-    if (!yPos[e.from] === undefined || !yPos[e.to] === undefined) continue;
+    if (yPos[e.from] === undefined || yPos[e.to] === undefined) continue;
     const x1 = colX(stageOf(res, e.from)), y1 = yPos[e.from] + nodeH / 2;
     const x2 = colX(stageOf(res, e.to)), y2 = yPos[e.to] + nodeH / 2;
     const mx = (x1 + x2) / 2;

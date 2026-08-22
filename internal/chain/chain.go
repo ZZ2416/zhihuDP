@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"zhihudp/internal/types"
 )
@@ -35,24 +36,53 @@ func (s *Service) Generate(ctx context.Context, code, market string) (*types.Cha
 	if err != nil {
 		return nil, err
 	}
-	// 厂商代码校验（AI 可能编造代码）
-	removed := 0
+	// 厂商代码校验（AI 可能编造代码；受控并发 5，避免串行慢且防东财限流）
+	const maxConcurrent = 5
+	sem := make(chan struct{}, maxConcurrent)
+	var (
+		mu      sync.Mutex
+		removed int
+		wg      sync.WaitGroup
+	)
+	type nodeResult struct {
+		nodeID string
+		valid  []types.ChainCompany
+		allBad bool
+	}
+	results := make(chan nodeResult, len(res.Companies))
 	for nodeID, cs := range res.Companies {
-		valid := make([]types.ChainCompany, 0, len(cs))
-		for _, c := range cs {
-			found, err := s.deps.Resolve(ctx, c.Code)
-			if err != nil || found == nil {
-				removed++
-				continue
+		wg.Add(1)
+		go func(nid string, list []types.ChainCompany) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			valid := make([]types.ChainCompany, 0, len(list))
+			bad := 0
+			for _, c := range list {
+				found, err := s.deps.Resolve(ctx, c.Code)
+				if err != nil || found == nil {
+					bad++
+					continue
+				}
+				valid = append(valid, types.ChainCompany{Code: found.Code, Name: found.Name})
 			}
-			valid = append(valid, types.ChainCompany{Code: found.Code, Name: found.Name})
+			results <- nodeResult{nodeID: nid, valid: valid, allBad: len(list) > 0 && bad == len(list)}
+		}(nodeID, cs)
+	}
+	wg.Wait()
+	close(results)
+	for r := range results {
+		if len(r.valid) == 0 {
+			delete(res.Companies, r.nodeID)
+			if r.allBad {
+				res.Degraded = true
+			}
+			continue
 		}
-		if len(valid) == 0 {
-			delete(res.Companies, nodeID)
-			res.Degraded = true
-		} else {
-			res.Companies[nodeID] = valid
-		}
+		mu.Lock()
+		removed += len(res.Companies[r.nodeID]) - len(r.valid) // 先算差（旧长度 - 新长度）
+		res.Companies[r.nodeID] = r.valid
+		mu.Unlock()
 	}
 	if removed > 0 {
 		res.Degraded = true
