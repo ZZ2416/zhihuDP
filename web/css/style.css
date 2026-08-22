@@ -544,3 +544,20 @@ footer p { margin: 3px 0; }
   border-radius: 4px; padding: 0 5px; font-size: 13px;
 }
 #fundamental-analysis hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+/* ===== 产业链图谱 ===== */
+.chain-scroll { overflow-x: auto; margin-bottom: 12px; }
+.chain-fig { min-width: 720px; }
+.chain-node { cursor: pointer; transition: opacity .15s; }
+.chain-node:hover { opacity: .85; }
+.chain-node.active rect { stroke: var(--accent); stroke-width: 2.2; fill: var(--accent-weak); }
+.chain-legend { text-align: center; font-size: 11.5px; color: var(--faint); padding: 6px 0 2px; }
+.chain-node-title { font-size: 14px; font-weight: 700; margin: 8px 0 10px; }
+.chain-company-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.chain-company {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--card-soft);
+  font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.chain-company:hover { border-color: var(--accent); background: var(--accent-weak); }
+.chain-company em { font-style: normal; font-size: 11px; color: var(--faint); }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"zhihudp/internal/agent"
+	"zhihudp/internal/chain"
 	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
 	"zhihudp/internal/finance"
@@ -115,6 +116,15 @@ func main() {
 	// 视频资讯（B站）
 	vp := &videoProvider{get: video.GetVideos}
 
+	// 产业链图谱服务（AI 生成 + 厂商校验）
+	chainSvc := chain.New(chain.Deps{
+		Resolve: stock.Resolve,
+		Generate: func(ctx context.Context, name, code string) (*types.ChainResult, error) {
+			return agent.GenerateChain(ctx, name, code, deps)
+		},
+	})
+	cp := &chainProvider{svc: chainSvc}
+
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -129,6 +139,7 @@ func main() {
 		mp,              // 分时数据（东财主 + 腾讯兜底）
 		vp,              // 视频资讯（B站）
 		fundProvider,    // 基本面评分数据（GET /api/fundamental）
+		cp,              // 产业链图谱（AI 生成）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -255,6 +266,18 @@ type fundamentalProvider struct {
 func (f *fundamentalProvider) GetScore(ctx context.Context, code, market string) (*types.FundamentalResult, error) {
 	return f.svc.Score(ctx, code, market)
 }
+
+// chainProvider 适配器
+type chainProvider struct {
+	svc *chain.Service
+}
+
+func (c *chainProvider) Generate(ctx context.Context, code, market string) (*types.ChainResult, error) {
+	return c.svc.Generate(ctx, code, market)
+}
+
+// 编译期断言：chainProvider 满足 server.ChainProvider
+var _ server.ChainProvider = (*chainProvider)(nil)
 
 // 编译期断言：fundamentalProvider 满足 server.FundamentalProvider
 var _ server.FundamentalProvider = (*fundamentalProvider)(nil)

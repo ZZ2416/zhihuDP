@@ -93,6 +93,13 @@
       <div class="fin-foot">数据来源：东方财富 · 财报解读仅供参考，不构成投资建议</div>
     </div>
 
+    <!-- 产业链图谱：AI 生成三列流程图，节点交互看同类型厂商 -->
+    <div class="card hidden" id="chain-card">
+      <div class="section-title">产业链图谱 <span class="fin-source">AI 生成 · 仅供参考</span></div>
+      <div id="chain-body"></div>
+      <div id="chain-companies" class="hidden"></div>
+    </div>
+
     <!-- 基本面分析：四维评分 + 估值 + AI 解读（ask 的 fundamental 事件与 delta） -->
     <div class="card hidden" id="fundamental-card">
       <div class="section-title">基本面分析 <span class="fin-source">东方财富 / 腾讯</span></div>
@@ -193,6 +200,7 @@
 <script src="/js/app.js"></script>
 <script src="/js/chat.js"></script>
 <script src="/js/finance.js"></script>
+<script src="/js/chain.js"></script>
 <script src="/js/video.js"></script>
 <script src="/js/keys.js"></script>
 </body>
