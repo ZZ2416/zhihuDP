@@ -6,6 +6,7 @@
 #
 #   方式 A：环境变量提供密钥（推荐，明文不落盘，直接生成密文）
 #     DEEPSEEK_API_KEY="sk-xxx" \
+#     ZHIHU_ACCESS_SECRET="xxx" \
 #       bash install.sh
 #
 #   方式 B：交互输入密钥（终端不回显）
@@ -16,6 +17,7 @@
 # 可选环境变量：
 #   APP_SOURCE  代码来源：git 仓库地址（默认 https://github.com/ZZ2416/zhihuDP.git）
 #                或本地目录路径（把代码 rsync 上传，适合私有仓库）
+#   GIT_BRANCH  克隆分支（默认仓库默认分支 main；emotion 版设 feature/emotion）
 #   GO_VERSION  Go 版本（默认 1.25.5）
 #   APP_PORT    监听端口（默认 8080，systemd + 防火墙同步）
 #   APP_USER    运行用户（默认 zhihudp，非 root）
@@ -29,6 +31,7 @@ set -euo pipefail
 
 # ---------- 参数 ----------
 APP_SOURCE="${APP_SOURCE:-https://github.com/ZZ2416/zhihuDP.git}"
+GIT_BRANCH="${GIT_BRANCH:-}"
 GO_VERSION="${GO_VERSION:-1.25.5}"
 APP_PORT="${APP_PORT:-8080}"
 APP_USER="${APP_USER:-zhihudp}"
@@ -117,9 +120,14 @@ else
     info "从本地目录上传代码: $APP_SOURCE"
     rsync -a --exclude '.git' --exclude 'config.yaml' --exclude '*.pem' "$APP_SOURCE/" "$BUILD_DIR/"
   else
-    info "克隆代码: $APP_SOURCE"
-    git clone --depth 1 -q "$APP_SOURCE" "$BUILD_DIR" \
-      || fail "git clone 失败：仓库是否公开？私有仓库请把代码 rsync 到服务器后设 APP_SOURCE=本地目录"
+    info "克隆代码: $APP_SOURCE（分支: ${GIT_BRANCH:-默认}）"
+    if [[ -n "$GIT_BRANCH" ]]; then
+      git clone --depth 1 -q -b "$GIT_BRANCH" "$APP_SOURCE" "$BUILD_DIR" \
+        || fail "git clone 失败：仓库是否公开？私有仓库请把代码 rsync 到服务器后设 APP_SOURCE=本地目录"
+    else
+      git clone --depth 1 -q "$APP_SOURCE" "$BUILD_DIR" \
+        || fail "git clone 失败：仓库是否公开？私有仓库请把代码 rsync 到服务器后设 APP_SOURCE=本地目录"
+    fi
   fi
   info "编译（go:embed 内嵌前端，产物为单文件）..."
   ( cd "$BUILD_DIR" && go build -trimpath -ldflags "-s -w" -o /tmp/zhihudp.bin ./cmd/server ) \
@@ -147,6 +155,12 @@ if [[ -z "$DEEPSEEK_API_KEY" ]]; then
   else
     warn "跳过：部署后打开网页，在开屏弹窗里上传密钥（同样 RSA 加密持久化）"
   fi
+fi
+
+# 知乎 Access Secret（emotion 分支情绪分析必需；main 分支无此配置忽略即可）
+ZHIHU_ACCESS_SECRET="${ZHIHU_ACCESS_SECRET:-}"
+if [[ -n "$ZHIHU_ACCESS_SECRET" ]]; then
+  info "检测到 ZHIHU_ACCESS_SECRET，将加密写入 config.yaml 的 zhihu 段"
 fi
 
 # 5.1 生成持久 RSA 密钥对（若私钥不存在）
@@ -178,11 +192,26 @@ encrypt_key() {
 }
 DEEPSEEK_ENC=""
 if [[ -n "$DEEPSEEK_API_KEY" ]]; then DEEPSEEK_ENC="$(encrypt_key "$DEEPSEEK_API_KEY")"; fi
+ZHIHU_ENC=""
+if [[ -n "$ZHIHU_ACCESS_SECRET" ]]; then ZHIHU_ENC="$(encrypt_key "$ZHIHU_ACCESS_SECRET")"; fi
+
+# 5.2.5 升级场景：环境变量未提供密钥时，保留旧 config.yaml 中已有密文（不覆盖不丢密钥）
+if [[ -f "$CONFIG_PATH" ]]; then
+  OLD_DEEPSEEK_ENC="$(awk '/api_key_enc:/{gsub(/[",]/, "", $2); print $2; exit}' "$CONFIG_PATH" 2>/dev/null || true)"
+  OLD_ZHIHU_ENC="$(awk '/access_secret_enc:/{gsub(/[",]/, "", $2); print $2; exit}' "$CONFIG_PATH" 2>/dev/null || true)"
+  [[ -z "$DEEPSEEK_ENC" && -n "$OLD_DEEPSEEK_ENC" ]] && { DEEPSEEK_ENC="$OLD_DEEPSEEK_ENC"; info "复用已有 DeepSeek 密文"; }
+  [[ -z "$ZHIHU_ENC" && -n "$OLD_ZHIHU_ENC" ]] && { ZHIHU_ENC="$OLD_ZHIHU_ENC"; info "复用已有知乎密文"; }
+fi
 
 # 5.3 组装最终 config.yaml（仅密文）
 {
   echo "keybox:"
   echo "  private_key: \"${PRIVATE_KEY}\""
+  if [[ -n "$ZHIHU_ENC" ]]; then
+    echo "zhihu:"
+    echo "  access_secret_enc: \"${ZHIHU_ENC}\""
+    echo "  openapi_base_url: \"https://developer.zhihu.com\""
+  fi
   echo "deepseek:"
   echo "  api_key_enc: \"${DEEPSEEK_ENC}\""
   echo "  base_url: \"https://api.deepseek.com\""
