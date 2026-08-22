@@ -204,3 +204,33 @@ type SentimentResult struct {
 	Degraded bool       `json:"degraded"` // true=降级（样本不足/搜索失败）
 	ErrMsg   string     `json:"err_msg,omitempty"`
 }
+
+// ChainNode 产业链节点（环节）
+type ChainNode struct {
+	ID    string `json:"id"`    // n1, n2...
+	Name  string `json:"name"`  // 环节名，如 上游-粮食/包装
+	Stage string `json:"stage"` // 上游/中游/下游
+	Desc  string `json:"desc"`  // 环节说明 ≤20 字
+}
+
+// ChainEdge 环节间上下游关系
+type ChainEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// ChainCompany 环节内同类型厂商（已校验 A 股代码）
+type ChainCompany struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// ChainResult 产业链图谱（AI 生成，服务端校验）
+type ChainResult struct {
+	Industry  string                    `json:"industry"` // 产业链名
+	Nodes     []ChainNode               `json:"nodes"`
+	Edges     []ChainEdge               `json:"edges"`
+	Companies map[string][]ChainCompany `json:"companies"` // nodeID → 厂商
+	Degraded  bool                      `json:"degraded"`
+	ErrMsg    string                    `json:"err_msg,omitempty"`
+}

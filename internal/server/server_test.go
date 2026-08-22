@@ -85,6 +85,22 @@ func (fakeFinanceProvider) AnalyzeFinance(_ context.Context, _, _ string, sink f
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "财务解析中…"}})
 }
 
+// fakeEmotionProvider 情绪解读桩
+type fakeEmotionProvider struct{}
+
+func (fakeEmotionProvider) Analyze(_ context.Context, _, _ string, sink func(types.Event) error) error {
+	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "情绪解读中…"}})
+}
+
+// fakeChainProvider 产业链桩
+type fakeChainProvider struct{}
+
+func (fakeChainProvider) Generate(_ context.Context, code, _ string) (*types.ChainResult, error) {
+	return &types.ChainResult{Industry: "测试产业链", Nodes: []types.ChainNode{
+		{ID: "n1", Name: "上游-测试", Stage: "上游", Desc: "测试"},
+	}}, nil
+}
+
 // fakeFundamentalProvider 基本面评分桩
 type fakeFundamentalProvider struct{}
 
@@ -114,7 +130,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, fakeEmotionProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, fakeEmotionProvider{}, fakeChainProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

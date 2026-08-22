@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"zhihudp/internal/agent"
+	"zhihudp/internal/chain"
 	"zhihudp/internal/chat"
 	"zhihudp/internal/config"
 	"zhihudp/internal/finance"
@@ -124,7 +125,6 @@ func main() {
 	// 情绪解读服务（知乎数据 + AI 解读）
 	ep := &emotionProvider{
 		analyze: func(ctx context.Context, code, market string, sink func(types.Event) error) error {
-			// 用代码识别股票名（走 resolve）再拉情绪
 			info, err := stock.Resolve(ctx, code)
 			if err != nil {
 				return err
@@ -136,6 +136,14 @@ func main() {
 			return agent.AnalyzeEmotion(ctx, info.Name, res, deps, sink)
 		},
 	}
+	// 产业链图谱服务（AI 生成 + 厂商校验）
+	chainSvc := chain.New(chain.Deps{
+		Resolve: stock.Resolve,
+		Generate: func(ctx context.Context, name, code string) (*types.ChainResult, error) {
+			return agent.GenerateChain(ctx, name, code, deps)
+		},
+	})
+	cp := &chainProvider{svc: chainSvc}
 
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
@@ -152,6 +160,7 @@ func main() {
 		vp,              // 视频资讯（B站）
 		fundProvider,    // 基本面评分数据（GET /api/fundamental）
 		ep,              // 情绪解读（POST /api/emotion/analyze）
+		cp,              // 产业链图谱（AI 生成）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -295,6 +304,18 @@ func (e *emotionProvider) Analyze(ctx context.Context, code, market string, sink
 
 // 编译期断言：emotionProvider 满足 server.EmotionProvider
 var _ server.EmotionProvider = (*emotionProvider)(nil)
+
+// chainProvider 适配器
+type chainProvider struct {
+	svc *chain.Service
+}
+
+func (c *chainProvider) Generate(ctx context.Context, code, market string) (*types.ChainResult, error) {
+	return c.svc.Generate(ctx, code, market)
+}
+
+// 编译期断言：chainProvider 满足 server.ChainProvider
+var _ server.ChainProvider = (*chainProvider)(nil)
 
 // 编译期断言：fundamentalProvider 满足 server.FundamentalProvider
 var _ server.FundamentalProvider = (*fundamentalProvider)(nil)
