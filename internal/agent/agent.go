@@ -177,6 +177,7 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "stock-analysis-agent",
 		Instruction: `你是股票分析助手。流程固定：
+0) 禁止输出任何过程性/思考性文字（如「我来分析」「先识别股票」「正在获取数据」等），直接调用工具，最终只输出解读正文；
 1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具；
 2) 再调用 analyze_sentiment 获取知乎情绪数据（热度/多空/参考强度/代表观点）；
 3) 再调用 analyze_fundamental 获取四维评分、财务指标与估值；

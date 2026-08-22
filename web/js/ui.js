@@ -42,9 +42,9 @@ function renderSentiment(s) {
 
 function ratioRow(label, cls, val) {
   const pct = Math.round((val || 0) * 100);
-  return '<div class="ratio-row"><span class="r-label">' + label + '</span>' +
-    '<span class="r-bar"><span class="r-fill ' + cls + '" style="width:' + pct + '%"></span></span>' +
-    '<span class="r-pct">' + pct + '%</span></div>';
+  return '<div class="ratio-row"><span class="rlabel">' + label + '</span>' +
+    '<span class="bar"><div class="' + cls + '" style="width:' + pct + '%"></div></span>' +
+    '<span class="rpct">' + pct + '%</span></div>';
 }
 
 /* ---- 实时报价卡（fetchKline 调用） ---- */
