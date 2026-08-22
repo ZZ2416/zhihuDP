@@ -28,13 +28,13 @@
 
 ## 界面截图（按时间排序）
 
-<img src="pic/Snipaste_2026-08-17_00-14-49.png" width="640" alt="截图 1">
+<img src="pic/page1.png" width="640" alt="截图 1">
 
-<img src="pic/Snipaste_2026-08-17_00-15-17.png" width="640" alt="截图 2">
+<img src="pic/page2.png" width="640" alt="截图 2">
 
-<img src="pic/Snipaste_2026-08-17_00-15-39.png" width="640" alt="截图 3">
+<img src="pic/page4.png" width="640" alt="截图 3">
 
-<img src="pic/Snipaste_2026-08-17_00-15-54.png" width="640" alt="截图 4">
+<img src="pic/page5.png" width="640" alt="截图 4">
 
 ## 版本变更
 
