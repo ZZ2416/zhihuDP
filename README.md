@@ -4,7 +4,7 @@
 
 <div align="center">
 
-**行情（日K/分时）· 财报指标 · 估值分位 · 四维基本面评分 · AI 流式解读 · AI 产业链图谱 · 看山追问**
+**行情（日K/分时）· 财报指标 · 估值分位 · 四维基本面评分 · AI 流式解读 · 看山追问**
 
 [GitHub](https://github.com/ZZ2416/zhihuDP) · [联系与反馈](https://github.com/ZZ2416/zhihuDP/issues)
 
@@ -22,26 +22,24 @@
 - 💹 **估值**：PE(TTM) 历史分位（东财 419 日序列）、PB、市值（腾讯兜底）
 - 📰 **相关资讯**：东方财富资讯，点击跳转原文
 - 🎬 **相关视频**：B站视频封面卡片（横滑）
-- 🕸️ **AI 产业链图谱**：LLM 生成上/中/下游三列流程图（6-10 环节 × 3-6 家真实 A 股厂商），厂商校验后点击节点查看同类型厂商并可跳查
 - 🦊 **与看山对话**：基于行情/财报/估值/评分上下文多轮追问，只给方法/维度/风险提示
 - 🔑 **密钥配置弹窗**：DeepSeek 密钥 RSA 公私钥加密传输 + 密文持久化（默认密钥绝不下发明文）
 - ⚡ **SSE 流式输出** · 🌙 **明暗主题** · 🛡️ **合规设计**（不荐股/无概率词/免责声明） · 📝 **友好降级**
 
 ## 界面截图（按时间排序）
 
-<img src="pic/Snipaste_2026-08-17_00-14-49.png" width="640" alt="截图 1">
+<img src="pic/page1.png" width="640" alt="截图 1">
 
-<img src="pic/Snipaste_2026-08-17_00-15-17.png" width="640" alt="截图 2">
+<img src="pic/page2.png" width="640" alt="截图 2">
 
-<img src="pic/Snipaste_2026-08-17_00-15-39.png" width="640" alt="截图 3">
+<img src="pic/page4.png" width="640" alt="截图 3">
 
-<img src="pic/Snipaste_2026-08-17_00-15-54.png" width="640" alt="截图 4">
+<img src="pic/page5.png" width="640" alt="截图 4">
 
 ## 版本变更
 
 | 版本 | 里程碑 | 说明 |
 |---|---|---|
-| **v3.1** | AI 产业链图谱 | LLM 生成上/中/下游三列流程图 + 厂商校验（真实 A 股、并发解析）+ 节点点击看同类型厂商可跳查 |
 | **v3.0** | 基本面分析（定位转型） | 移除知乎情绪分析；四维评分（盈利/成长/财务健康/估值分位）+ AI 基本面解读；估值 PE 历史分位 |
 | v2.3 | 分时图 + B站视频 | 分时图交互与 30s 实时刷新、查询中占位；B站视频资讯（wbi 签名）封面卡片横滑、按时间/播放量排序 |
 | v2.2 | 财报解析 + 分时图 | 东财双源财务指标（5年年报）+ AI 流式解读；日K/分时切换；看山对话注入财报上下文；东财资讯可跳转原文 |
@@ -49,15 +47,6 @@
 | v1.x | 一期核心 | 个股识别 → 行情/K线 → 情绪面板 → AI 分析；热门榜单、讨论文章、密钥弹窗（RSA 加密）、看山主题 |
 
 > 完整逐条变更见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
-
-### 分支版本（当前并行维护两份部署）
-
-| 分支 | 端口 | 功能集 |
-|---|---|---|
-| **main**（默认） | 8080 | 基本面四维评分 + AI 基本面解读 + **AI 产业链图谱**（不含知乎情绪） |
-| **feature/emotion**（独立功能分支） | 8081 | 上述全部功能 **+ 知乎情绪分析**（情绪解读 SSE 面板，`/api/ask` 事件含 `sentiment`） |
-
-> 情绪版作为独立功能分支长期保留、**不并入 main**；两端口共用同一 RSA 私钥体系与配置模板（改 `config.yaml` 端口即可切换）。
 
 ## 技术栈
 
@@ -143,7 +132,6 @@ curl "http://localhost:8080/api/resolve?q=600519"
 | `GET /api/finance?code=&market=` | 财务指标（5年年报 + 最新期，东财双源） |
 | `GET /api/fundamental?code=&market=` | 基本面四维评分 + 估值（PE分位/PB/市值） |
 | `POST /api/finance/analyze` | 财报 AI 解析（SSE 流式，计配额） |
-| `POST /api/chain` | AI 产业链图谱（LLM 生成 JSON，厂商校验；生成失败 400/502 分流） |
 | `GET /api/hot?type=stock\|sector\|sector_fall\|sector_stock` | 热门股票 / 上升板块 / 暴跌板块 / 板块成分股 |
 | `GET /api/news?keyword=&count=` | 相关资讯（标题可跳转原文） |
 | `GET /api/video?keyword=&count=` | 相关视频（B站，前端按时间/播放量排序） |
@@ -157,9 +145,8 @@ zhihuDP/
 ├── cmd/server/            # 入口：配置加载 → 依赖组装 → 启动（含 CLI 模式）
 ├── internal/
 │   ├── server/            # HTTP 层：Router + Handler（依赖 Analyzer/FinanceProvider 等接口）
-│   ├── agent/             # controller 层：eino ADK ReAct 编排 + 看山对话 + 财报/产业链生成
+│   ├── agent/             # controller 层：eino ADK ReAct 编排 + 看山对话 + 财报解析
 │   ├── chat/              # service 层（二期）：会话存储（按股票隔离）+ 上下文事实组装
-│   ├── chain/             # service 层：产业链厂商校验（去重缓存 + 并发解析 + 仅A股）
 │   ├── finance/           # dao 层：财务指标（东财 datacenter 主 + F10 兜底）
 │   ├── minute/            # dao 层：当日分时（东财 trends2 主 + 腾讯兜底）
 │   ├── video/             # dao 层：B站视频搜索（wbi 签名）
@@ -190,10 +177,6 @@ zhihuDP/
 | [features/minute/SRS.md](features/minute/SRS.md) | 分时图需求规格 |
 | [features/fundamental/设计方案.md](features/fundamental/设计方案.md) | 基本面分析设计方案（四维评分/估值分位） |
 | [features/fundamental/SDD.md](features/fundamental/SDD.md) | 基本面分析技术设计（v0.4 含实现差异） |
-| [features/chain/设计方案.md](features/chain/设计方案.md) | AI 产业链图谱设计方案（LLM 严格 JSON + 厂商校验 + 三列 SVG 交互） |
-| [features/chain/SDD.md](features/chain/SDD.md) | 产业链图谱技术设计 |
-| [features/emotion/设计方案.md](features/emotion/设计方案.md) | 知乎情绪分析设计方案（与基本面并存，各自独立解读） |
-| [features/emotion/SDD.md](features/emotion/SDD.md) | 情绪分析技术设计（emotion 分支） |
 | [features/minute/SDD.md](features/minute/SDD.md) | 分时图技术设计 |
 | [features/video/SRS.md](features/video/SRS.md) | B站相关视频需求规格 |
 | [features/video/SDD.md](features/video/SDD.md) | B站相关视频技术设计 |
@@ -204,8 +187,7 @@ zhihuDP/
 - [x] **阶段 1**：个股识别 → 行情/财报/AI 分析（数据底座）
 - [x] **阶段 2**：看山对话、密钥安全、分时图、媒体播放
 - [x] **阶段 3（当前）**：基本面定位转型——四维评分 + 估值分位 + AI 解读
-- [x] **阶段 3.5**：AI 产业链图谱（上/中/下游流程图 + 厂商校验交互）
-- [ ] 阶段 4：评分历史对比、批量数据导出、产业链跨链聚合
+- [ ] 阶段 4：产业链聚合分析、评分历史对比、批量数据导出
 
 ## 免责声明
 
