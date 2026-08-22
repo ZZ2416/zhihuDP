@@ -2,6 +2,7 @@
 let analysisText = '';
 let renderTimer = null;
 let gotFundamental = false; // 本次分析是否收到基本面评分
+let curStock = null;        // 当前查看的股票（情绪解读等用）
 let searchId = 0;            // 搜索序号（doSearch 重入保护）
 
 /* ---- 视图切换 ---- */
@@ -75,6 +76,7 @@ async function doSearch() {
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
   gotFundamental = false;
+  curStock = null;
   $('sentiment-card').classList.add('hidden');
   $('sentiment-body').innerHTML = '<span class="fin-loading">正在分析…</span>';
   $('sentiment-analysis').innerHTML = '';
@@ -113,6 +115,7 @@ function handleEvent(event, data, myId) {
   switch (event) {
     case 'stock':
       if (myId !== searchId) break;
+      curStock = { code: d.code, market: d.market, name: d.name };
       $('stock-head').innerHTML =
         '<span class="name">' + esc(d.name || '') + '</span>' +
         '<span class="code">' + esc(d.code || '') + '</span>' +
