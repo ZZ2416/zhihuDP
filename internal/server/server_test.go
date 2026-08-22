@@ -56,9 +56,9 @@ func (fakeKeyService) PublicKeyPEM() string {
 
 func (fakeKeyService) DecryptOAEPBase64(b64 string) ([]byte, error) { return []byte(b64), nil }
 
-func (fakeKeyService) UpdateKeys(deepseekKey string) error { return nil }
+func (fakeKeyService) UpdateKeys(deepseekKey, zhihuSecret string) error { return nil }
 
-func (fakeKeyService) PersistKeys(deepseekKeyEnc string) error { return nil }
+func (fakeKeyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error { return nil }
 
 // fakeChatProvider 二期对话桩：直接回一段 delta
 type fakeChatProvider struct{}
@@ -67,7 +67,7 @@ func (fakeChatProvider) Chat(_ context.Context, _, _, _ string, sink func(types.
 	return sink(types.Event{Type: "delta", Data: map[string]string{"text": "看山觉得…"}})
 }
 
-func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ string) {
+func (fakeChatProvider) SetSnapshot(_ string, _ types.StockInfo, _ *types.SentimentResult, _ string) {
 }
 
 func (fakeChatProvider) Reset(_ string) {}
@@ -114,7 +114,7 @@ func newTestServer() *Server {
 		"css/style.css": {Data: []byte("body{}")},
 		"js/app.js":     {Data: []byte("// app")},
 	}
-	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, "", "", frontend)
+	return New(fakeAnalyzer{}, fakeResolver{}, fakeKlineProvider{}, fakeNewsProvider{}, fakeHotProvider{}, fakeKeyService{}, fakeChatProvider{}, fakeFinanceProvider{}, fakeMinuteProvider{}, fakeVideoProvider{}, fakeFundamentalProvider{}, fakeEmotionProvider{}, "", "", frontend)
 }
 
 var _ fs.FS = (fstest.MapFS)(nil)

@@ -8,6 +8,12 @@
 keybox:
   private_key: ""                     # 可选：私钥文件路径；留空用默认 ~/.zhihudp/zhihudp_private.pem
 
+zhihu:
+  access_secret: ""                   # 方式A：明文知乎 Access Secret（developer.zhihu.com/profile 获取）
+  access_secret_enc: ""               # 方式B：RSA 公钥加密后的密文（存在时优先）
+  openapi_base_url: "https://developer.zhihu.com"
+  zhihu_search_url: ""                # 可选：完整 endpoint，优先级最高；留空用默认
+
 deepseek:
   api_key: ""                         # 方式A：明文 DeepSeek API Key
   api_key_enc: ""                     # 方式B：RSA 公钥加密后的密文（存在时优先）

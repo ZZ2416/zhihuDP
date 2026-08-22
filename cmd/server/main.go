@@ -23,11 +23,13 @@ import (
 	"zhihudp/internal/kline"
 	"zhihudp/internal/minute"
 	"zhihudp/internal/news"
+	"zhihudp/internal/sentiment"
 	"zhihudp/internal/server"
 	"zhihudp/internal/stock"
 	"zhihudp/internal/types"
 	"zhihudp/internal/valuation"
 	"zhihudp/internal/video"
+	"zhihudp/internal/zhihu"
 	"zhihudp/web"
 )
 
@@ -68,7 +70,8 @@ func main() {
 	}
 
 	// 组装依赖 + HTTP 层（依赖注入：各包无全局状态）
-	ks := &keyService{KeyBox: kb, cfg: cfg, configPath: *configPath}
+	zhClient := zhihu.New(cfg.Zhihu)
+	ks := &keyService{KeyBox: kb, cfg: cfg, zhClient: zhClient, configPath: *configPath}
 	// 基本面评分服务（财务东财 + 估值腾讯/东财分位）
 	fundSvc := fundamental.New(fundamental.Deps{
 		Finance:   finance.GetResult,
@@ -76,6 +79,9 @@ func main() {
 	})
 	fundProvider := &fundamentalProvider{svc: fundSvc}
 	deps := buildDeps(cfg)
+	deps.AnalyzeSentiment = func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
+		return sentiment.Analyze(ctx, code, name, zhClient, cfg.GetDeepSeek())
+	}
 	deps.FundamentalScore = fundSvc.Score
 
 	// 二期：看山追问对话服务（会话按股票隔离，快照由 /api/ask 捕获）
@@ -115,6 +121,22 @@ func main() {
 	// 视频资讯（B站）
 	vp := &videoProvider{get: video.GetVideos}
 
+	// 情绪解读服务（知乎数据 + AI 解读）
+	ep := &emotionProvider{
+		analyze: func(ctx context.Context, code, market string, sink func(types.Event) error) error {
+			// 用代码识别股票名（走 resolve）再拉情绪
+			info, err := stock.Resolve(ctx, code)
+			if err != nil {
+				return err
+			}
+			res, err := sentiment.Analyze(ctx, code, info.Name, zhClient, cfg.GetDeepSeek())
+			if err != nil {
+				return err
+			}
+			return agent.AnalyzeEmotion(ctx, info.Name, res, deps, sink)
+		},
+	}
+
 	srv := server.New(
 		analyzerFunc(func(ctx context.Context, stock string, sink func(types.Event) error) error {
 			return agent.RunAnalysis(ctx, stock, deps, sink)
@@ -129,6 +151,7 @@ func main() {
 		mp,              // 分时数据（东财主 + 腾讯兜底）
 		vp,              // 视频资讯（B站）
 		fundProvider,    // 基本面评分数据（GET /api/fundamental）
+		ep,              // 情绪解读（POST /api/emotion/analyze）
 		cfg.Media.Dir,   // 媒体目录（/media/ 播放；空 = 禁用）
 		cfg.Media.Token, // 媒体访问令牌（抖音式禁止转载：无/错 token 403）
 		web.FS,          // 前端资源（go:embed 内嵌）
@@ -195,21 +218,26 @@ func (f hotProviderFunc) GetSectorStocks(ctx context.Context, code string, count
 type keyService struct {
 	*keybox.KeyBox
 	cfg        *config.Config
+	zhClient   *zhihu.Client
 	configPath string // config.yaml 路径（上传密钥后持久化密文用）
 }
 
 // UpdateKeys 应用用户提交的 DeepSeek 密钥（空值保留原密钥）
-func (k *keyService) UpdateKeys(deepseekKey string) error {
+func (k *keyService) UpdateKeys(deepseekKey, zhihuSecret string) error {
 	if deepseekKey != "" {
 		k.cfg.SetDeepSeekKey(deepseekKey) // 线程安全写入（agent 并发读取）
+	}
+	if zhihuSecret != "" {
+		k.cfg.Zhihu.AccessSecret = zhihuSecret
+		k.zhClient.UpdateKeys(zhihuSecret)
 	}
 	return nil
 }
 
 // PersistKeys 把加密后的密钥密文写回 config.yaml（只写 *_enc 字段，绝不落明文），
 // 重启后加载解密恢复 —— 仓库/配置泄露也只是密文。
-func (k *keyService) PersistKeys(deepseekKeyEnc string) error {
-	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc)
+func (k *keyService) PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error {
+	return k.cfg.PersistEnc(k.configPath, deepseekKeyEnc, zhihuSecretEnc)
 }
 
 // financeProvider 财报服务适配器：数据（finance dao）+ AI 解析（agent）
@@ -256,6 +284,18 @@ func (f *fundamentalProvider) GetScore(ctx context.Context, code, market string)
 	return f.svc.Score(ctx, code, market)
 }
 
+// emotionProvider 适配器：情绪解读
+type emotionProvider struct {
+	analyze func(ctx context.Context, code, market string, sink func(types.Event) error) error
+}
+
+func (e *emotionProvider) Analyze(ctx context.Context, code, market string, sink func(types.Event) error) error {
+	return e.analyze(ctx, code, market, sink)
+}
+
+// 编译期断言：emotionProvider 满足 server.EmotionProvider
+var _ server.EmotionProvider = (*emotionProvider)(nil)
+
 // 编译期断言：fundamentalProvider 满足 server.FundamentalProvider
 var _ server.FundamentalProvider = (*fundamentalProvider)(nil)
 
@@ -276,6 +316,13 @@ func decryptEncKeys(cfg *config.Config, kb *keybox.KeyBox) error {
 			return fmt.Errorf("解密 deepseek.api_key_enc 失败: %w", err)
 		}
 		cfg.DeepSeek.APIKey = string(plain)
+	}
+	if cfg.Zhihu.AccessSecretEnc != "" && cfg.Zhihu.AccessSecret == "" {
+		plain, err := kb.DecryptOAEPBase64(cfg.Zhihu.AccessSecretEnc)
+		if err != nil {
+			return fmt.Errorf("解密 zhihu.access_secret_enc 失败: %w", err)
+		}
+		cfg.Zhihu.AccessSecret = string(plain)
 	}
 	return nil
 }
@@ -328,11 +375,15 @@ func buildDeps(cfg *config.Config) agent.Deps {
 
 // runCLI 命令行模式：跑一次分析，打印事件
 func runCLI(query string, cfg *config.Config) {
+	zhClient := zhihu.New(cfg.Zhihu)
 	fundSvc := fundamental.New(fundamental.Deps{
 		Finance:   finance.GetResult,
 		Valuation: valuation.Get,
 	})
 	deps := buildDeps(cfg)
+	deps.AnalyzeSentiment = func(ctx context.Context, code, name string) (*types.SentimentResult, error) {
+		return sentiment.Analyze(ctx, code, name, zhClient, cfg.GetDeepSeek())
+	}
 	deps.FundamentalScore = fundSvc.Score
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()

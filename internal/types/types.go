@@ -81,6 +81,7 @@ type ChatFacts struct {
 	StockCode    string
 	Market       string // 市场（沪A/深A）
 	Quote        string // 行情快照文本（报价级）
+	Sentiment    string // 情绪摘要（热度/多空/参考强度/代表观点）
 	Finance      string // 财务指标摘要（最近5年年报+最新期）
 	Valuation    string // 估值摘要（PE/PB/分位，功能点7注入）
 	Score        string // 四维评分摘要（功能点7注入）
@@ -172,4 +173,34 @@ type FundamentalResult struct {
 	Valuation  Valuation            `json:"valuation"`
 	Score      FundamentalScore     `json:"score"`
 	Degraded   bool                 `json:"degraded"`
+}
+
+// Ratio 多空占比（和为 1）
+type Ratio struct {
+	Bull    float64 `json:"bull"`    // 看多占比 0-1
+	Bear    float64 `json:"bear"`    // 看空占比 0-1
+	Neutral float64 `json:"neutral"` // 中性占比 0-1
+}
+
+// ViewItem 代表观点
+type ViewItem struct {
+	Title     string `json:"title"`
+	Url       string `json:"url"`
+	Author    string `json:"author,omitempty"`    // 作者
+	VoteUp    int    `json:"vote_up,omitempty"`   // 点赞数
+	Excerpt   string `json:"excerpt,omitempty"`   // 内容摘要
+	Sentiment string `json:"sentiment,omitempty"` // bull/bear/neutral
+}
+
+// SentimentResult 情绪分析结果
+type SentimentResult struct {
+	Code     string     `json:"code"`
+	Name     string     `json:"name"`
+	Heat     int        `json:"heat"`   // 讨论量（本次取回条数）
+	Sample   int        `json:"sample"` // 实际分类样本数
+	Ratio    Ratio      `json:"ratio"`
+	Score    *int       `json:"score"`    // 参考强度 1-10；样本不足 nil
+	Items    []ViewItem `json:"items"`    // 代表观点 ≤5
+	Degraded bool       `json:"degraded"` // true=降级（样本不足/搜索失败）
+	ErrMsg   string     `json:"err_msg,omitempty"`
 }

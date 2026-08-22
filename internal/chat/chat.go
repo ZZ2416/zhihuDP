@@ -14,8 +14,9 @@ import (
 
 // Snapshot 一期 /api/ask 结果快照（由 handler_ask 捕获事件写入）
 type Snapshot struct {
-	Stock    types.StockInfo // 股票信息（code/name/market）
-	Analysis string          // 一期 AI 分析最终文本
+	Stock     types.StockInfo        // 股票信息（code/name/market）
+	Sentiment *types.SentimentResult // 情绪结果（可能 nil，如降级）
+	Analysis  string                 // 一期 AI 分析最终文本
 }
 
 // Session 单个股票的对话会话
@@ -136,8 +137,8 @@ type Service struct {
 func New(store *Store, deps Deps) *Service { return &Service{store: store, deps: deps} }
 
 // SetSnapshot 实现 server.ChatProvider：一期 /api/ask 结束后写入结果快照
-func (s *Service) SetSnapshot(code string, stock types.StockInfo, analysis string) {
-	s.store.SetSnapshot(code, Snapshot{Stock: stock, Analysis: analysis})
+func (s *Service) SetSnapshot(code string, stock types.StockInfo, sentiment *types.SentimentResult, analysis string) {
+	s.store.SetSnapshot(code, Snapshot{Stock: stock, Sentiment: sentiment, Analysis: analysis})
 }
 
 // Reset 实现 server.ChatProvider：清空某股票会话
@@ -188,9 +189,12 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 				q.Price, q.Change, q.ChangePct, q.Open, q.High, q.Low, q.Volume)
 		}
 	}
-	// 前次分析快照（不写回 sess，避免并发 data race；名称缺失用快照补）
+	// 情绪摘要 + 前次分析快照（不写回 sess，避免并发 data race；名称缺失用快照补）
 	if snap, ok := s.store.SnapshotOf(sess.Stock.Code); ok {
 		facts.PrevAnalysis = snap.Analysis
+		if snap.Sentiment != nil {
+			facts.Sentiment = formatSentiment(snap.Sentiment)
+		}
 		if facts.StockName == "" {
 			facts.StockName = snap.Stock.Name
 		}
@@ -212,6 +216,29 @@ func (s *Service) buildFacts(ctx context.Context, sess *Session, market string) 
 		}
 	}
 	return facts, nil
+}
+
+// formatSentiment 情绪 → 紧凑文本
+func formatSentiment(r *types.SentimentResult) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("讨论热度 %d，样本 %d；看多 %.0f%%，看空 %.0f%%，中性 %.0f%%",
+		r.Heat, r.Sample, r.Ratio.Bull*100, r.Ratio.Bear*100, r.Ratio.Neutral*100))
+	if r.Score != nil {
+		b.WriteString(fmt.Sprintf("；参考强度 %d/10", *r.Score))
+	}
+	if r.Degraded {
+		b.WriteString("；数据降级（" + r.ErrMsg + "）")
+	}
+	if len(r.Items) > 0 {
+		b.WriteString("；代表观点：")
+		for i, it := range r.Items {
+			if i >= 5 {
+				break
+			}
+			b.WriteString("「" + it.Title + "」")
+		}
+	}
+	return b.String()
 }
 
 // formatScore 四维评分 → 紧凑文本

@@ -17,7 +17,7 @@ func TestPersistEncOnlyWritesEncFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cfg.PersistEnc(path, "ENC_DS"); err != nil {
+	if err := cfg.PersistEnc(path, "ENC_DS", "ENC_ZH"); err != nil {
 		t.Fatalf("PersistEnc 失败: %v", err)
 	}
 	// 重新加载：明文保留，enc 新增

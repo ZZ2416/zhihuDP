@@ -75,6 +75,9 @@ async function doSearch() {
   $('chat-card').classList.add('hidden');   // 二期：切股重置对话区（会话由服务端按 code 隔离）
   $('chat-msgs').innerHTML = '';
   gotFundamental = false;
+  $('sentiment-card').classList.add('hidden');
+  $('sentiment-body').innerHTML = '<span class="fin-loading">正在分析…</span>';
+  $('sentiment-analysis').innerHTML = '';
   $('fundamental-card').classList.add('hidden');
   $('fundamental-score').innerHTML = '<span class="fin-loading">正在评分…</span>';
   $('fundamental-analysis').innerHTML = '<span id="cursor" class="blink"></span>';
@@ -121,6 +124,12 @@ function handleEvent(event, data, myId) {
       loadVideo(d.name);             // 相关视频（B站，封面卡片横滑）
 
       resetChat({ code: d.code, market: d.market, name: d.name }); // 二期：绑定看山对话
+      break;
+    case 'sentiment':
+      if (myId !== searchId) break;
+      renderSentiment(d);
+      $('sentiment-card').classList.remove('hidden');
+      if (curStock) analyzeEmotion(curStock.code, curStock.market); // 自动触发情绪解读
       break;
     case 'fundamental': if (myId !== searchId) break; gotFundamental = true; renderFundamental(d); break;
     case 'delta': if (myId !== searchId) break; appendDelta(d.text || ''); break;
@@ -236,3 +245,35 @@ function setHotContext(isSector, name) {
   }
 }
 
+
+/* ---- 情绪 AI 解读（POST /api/emotion/analyze，独立于基本面解读） ---- */
+async function analyzeEmotion(code, market) {
+  const box = $('sentiment-analysis');
+  if (!box) return;
+  box.innerHTML = '<span class="fin-loading">正在解读情绪…</span>';
+  let text = '';
+  try {
+    const resp = await apiEmotionAnalyze(code, market);
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      box.innerHTML = '<span style="color:var(--faint)">情绪解读不可用：' + esc(j.error || '') + '</span>';
+      return;
+    }
+    box.innerHTML = '<div class="emotion-ai"></div>';
+    const el = box.querySelector('.emotion-ai');
+    let mdTimer = null;
+    await readSSE(resp, (event, data) => {
+      let d = {};
+      try { d = data ? JSON.parse(data) : {}; } catch (e) {}
+      if (event === 'delta') {
+        text += d.text || '';
+        clearTimeout(mdTimer);
+        mdTimer = setTimeout(() => { el.innerHTML = renderMarkdown(text); }, 80);
+      } else if (event === 'error') {
+        el.innerHTML = '<span style="color:var(--err-text)">情绪解读失败：' + esc(d.message || '') + '</span>';
+      }
+    });
+  } catch (e) {
+    box.innerHTML = '<span style="color:var(--faint)">情绪解读失败</span>';
+  }
+}

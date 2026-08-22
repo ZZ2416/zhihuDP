@@ -1,4 +1,51 @@
-/* ui.js —— 展示层：报价卡 / 资讯 / 热门 / 基本面评分 渲染 */
+/* ui.js —— 展示层：报价卡 / 情绪面板 / 资讯 / 热门 / 基本面评分 渲染 */
+const sentiLabel = { bull: '看多', bear: '看空', neutral: '中性' };
+const scoreClass = n => n <= 3 ? 'low' : (n <= 7 ? 'mid' : 'high');
+
+/* ---- 情绪面板（zhihu_search 数据渲染） ---- */
+function renderSentiment(s) {
+  if (!s) return;
+  let html = '';
+  if (s.degraded) {
+    html += '<div class="degraded">' + esc(s.err_msg || '数据不足，已降级展示') + '</div>';
+  }
+  html += '<div class="heat"><span class="num">' + (s.heat || 0) + '</span>' +
+    '<span class="label">条近期讨论</span>' +
+    '<span class="sample">样本 ' + (s.sample || 0) + ' 条</span></div>';
+
+  const r = s.ratio || {};
+  html += ratioRow('看多', 'bull', r.bull) + ratioRow('看空', 'bear', r.bear) + ratioRow('中性', 'neutral', r.neutral);
+
+  if (s.score != null) {
+    html += '<div class="score-box">' +
+      '<span class="score-num ' + scoreClass(s.score) + '">' + s.score + '<small style="font-size:14px;color:var(--faint)">/10</small></span>' +
+      '<span class="score-note">参考强度：反映当前讨论情绪与数据的充分程度，不代表涨跌预测。</span></div>';
+  }
+
+  const items = s.items || [];
+  if (items.length) {
+    html += '<div class="section-title" style="margin-top:18px">代表观点</div><div class="items">';
+    for (const it of items) {
+      html += '<div class="item">' +
+        '<div class="title-line">' +
+        '<a href="' + esc(it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title || '(无标题)') + '</a>' +
+        '<span class="tag-sentiment ' + esc(it.sentiment || 'neutral') + '">' + esc(sentiLabel[it.sentiment] || '中性') + '</span>' +
+        '</div>' +
+        '<div class="meta"><span>✍️ ' + esc(it.author || '匿名') + '</span><span>👍 ' + (it.vote_up || 0) + '</span></div>' +
+        '<div class="excerpt">' + esc(it.excerpt || '') + '</div>' +
+        '</div>';
+    }
+    html += '</div>';
+  }
+  $('sentiment-body').innerHTML = html;
+}
+
+function ratioRow(label, cls, val) {
+  const pct = Math.round((val || 0) * 100);
+  return '<div class="ratio-row"><span class="r-label">' + label + '</span>' +
+    '<span class="r-bar"><span class="r-fill ' + cls + '" style="width:' + pct + '%"></span></span>' +
+    '<span class="r-pct">' + pct + '%</span></div>';
+}
 
 /* ---- 实时报价卡（fetchKline 调用） ---- */
 function renderQuote(q) {

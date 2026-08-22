@@ -24,6 +24,7 @@ import (
 // Deps agent 依赖（由 cmd/server 组装注入，避免全局状态）
 type Deps struct {
 	ResolveStock     func(ctx context.Context, query string) (*types.StockInfo, error)
+	AnalyzeSentiment func(ctx context.Context, code, name string) (*types.SentimentResult, error)
 	FundamentalScore func(ctx context.Context, code, market string) (*types.FundamentalResult, error)
 	// DeepSeek 配置 getter：每次调用取最新（支持密钥热更新）
 	DeepSeek func() config.DeepSeekConfig
@@ -129,6 +130,25 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		return nil, fmt.Errorf("构建 resolve_stock 工具失败: %w", err)
 	}
 
+	sentTool, err := utils.InferTool("analyze_sentiment",
+		"分析股票在知乎的讨论情绪，返回热度、多空占比、参考强度分、代表观点。",
+		func(ctx context.Context, req *struct {
+			Code string `json:"code" jsonschema_description:"股票代码，如 600519"`
+			Name string `json:"name" jsonschema_description:"股票名称，如 贵州茅台"`
+		}) (string, error) {
+			result, err := deps.AnalyzeSentiment(ctx, req.Code, req.Name)
+			if err != nil {
+				b, _ := json.Marshal(map[string]any{"degraded": true, "err_msg": "情绪数据暂时不可用，请稍后重试"})
+				return string(b), nil
+			}
+			_ = sink(types.Event{Type: "sentiment", Data: result})
+			b, _ := json.Marshal(result)
+			return string(b), nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("构建 analyze_sentiment 工具失败: %w", err)
+	}
+
 	fundTool, err := utils.InferTool("analyze_fundamental",
 		"分析股票基本面，返回四维评分（盈利/成长/财务健康/估值）、财务指标与估值数据。",
 		func(ctx context.Context, req *struct {
@@ -156,10 +176,11 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "stock-analysis-agent",
-		Instruction: `你是股票基本面分析助手。流程固定：
+		Instruction: `你是股票分析助手。流程固定：
 1) 必须先调用 resolve_stock 识别股票；若返回 found=false，直接回复其中的 message（如「未找到该股票，请检查名称或代码」），不要继续调用其他工具；
-2) 再调用 analyze_fundamental 获取四维评分、财务指标与估值；
-3) 基于返回的 JSON 撰写基本面解读，分五段：
+2) 再调用 analyze_sentiment 获取知乎情绪数据（热度/多空/参考强度/代表观点）；
+3) 再调用 analyze_fundamental 获取四维评分、财务指标与估值；
+4) 基于返回的 JSON 撰写基本面解读，分五段：
    一、综合质地（引用 score.total 总分与 grade 定性）；
    二、盈利能力（ROE/毛利率/净利率水平与趋势）；
    三、成长性（营收/净利同比与历史趋势）；
@@ -170,7 +191,7 @@ func newChatModelAgent(ctx context.Context, deps Deps, sink func(types.Event) er
 		Model: cm,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
-				Tools: []tool.BaseTool{resolveTool, fundTool},
+				Tools: []tool.BaseTool{resolveTool, sentTool, fundTool},
 			},
 		},
 		MaxIterations: 5,

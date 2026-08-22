@@ -93,6 +93,13 @@
       <div class="fin-foot">数据来源：东方财富 · 财报解读仅供参考，不构成投资建议</div>
     </div>
 
+    <!-- 情绪面板（知乎讨论，基本面之上） -->
+    <div class="card hidden" id="sentiment-card">
+      <div class="section-title">情绪面板 <span class="fin-source">知乎公开讨论</span></div>
+      <div id="sentiment-body"><span class="fin-loading">正在分析…</span></div>
+      <div id="sentiment-analysis"></div>
+    </div>
+
     <!-- 基本面分析：四维评分 + 估值 + AI 解读（ask 的 fundamental 事件与 delta） -->
     <div class="card hidden" id="fundamental-card">
       <div class="section-title">基本面分析 <span class="fin-source">东方财富 / 腾讯</span></div>
@@ -172,6 +179,8 @@
     </div>
     <label for="key-deepseek">DeepSeek API Key（可留空）</label>
     <input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+    <label for="key-zhihu">知乎三方 API Key / Access Secret（可留空）</label>
+    <input id="key-zhihu" type="password" placeholder="access secret" autocomplete="off" spellcheck="false">
     <div class="key-actions">
       <button class="btn btn-skip" id="key-skip" onclick="skipKeys()">跳过，使用默认密钥</button>
       <button class="btn btn-save" id="key-save" onclick="saveKeys()">保存我的密钥</button>

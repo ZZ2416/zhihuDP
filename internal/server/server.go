@@ -100,10 +100,10 @@ type KeyService interface {
 	PublicKeyPEM() string
 	// DecryptOAEPBase64 用私钥解密前端提交的 base64(RSA-OAEP 密文)；空串输入返回空
 	DecryptOAEPBase64(b64 string) ([]byte, error)
-	// UpdateKeys 接收解密后的 DeepSeek 密钥并热更新
-	UpdateKeys(deepseekKey string) error
+	// UpdateKeys 接收解密后的密钥并热更新（DeepSeek + 知乎；空值跳过）
+	UpdateKeys(deepseekKey, zhihuSecret string) error
 	// PersistKeys 把加密后的密钥密文持久化到 config.yaml（只写 *_enc 字段，不落明文）
-	PersistKeys(deepseekKeyEnc string) error
+	PersistKeys(deepseekKeyEnc, zhihuSecretEnc string) error
 }
 
 // VideoProvider 视频资讯服务接口（由入口 videoProvider 实现）
@@ -128,8 +128,8 @@ type FinanceProvider interface {
 type ChatProvider interface {
 	// Chat 处理一次追问：SSE 事件经 sink 转发（delta → done）
 	Chat(ctx context.Context, code, market, message string, sink func(types.Event) error) error
-	// SetSnapshot 一期 /api/ask 结束后写入结果快照（分析文本），供对话上下文使用
-	SetSnapshot(code string, stock types.StockInfo, analysis string)
+	// SetSnapshot 一期 /api/ask 结束后写入结果快照（情绪 + 分析文本），供对话上下文使用
+	SetSnapshot(code string, stock types.StockInfo, sentiment *types.SentimentResult, analysis string)
 	// Reset 清空某股票的对话会话（前端「清空」按钮）
 	Reset(code string)
 }
@@ -147,6 +147,7 @@ type Server struct {
 	minute        MinuteProvider
 	video         VideoProvider
 	fundamental   FundamentalProvider
+	emotion       EmotionProvider
 	quota         *QuotaStore // 会话配额：每次打开页面 20 次 API 调用
 	mediaDir      string      // 媒体目录（/media/ 播放）；空 = 禁用
 	mediaToken    string      // 媒体访问令牌；空/不匹配 → 403（防未授权访问与转发）
@@ -154,7 +155,7 @@ type Server struct {
 }
 
 // New 创建 Server
-func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, fundamental FundamentalProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
+func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, newsProvider NewsProvider, hotProvider HotProvider, keyService KeyService, chatProvider ChatProvider, finance FinanceProvider, minute MinuteProvider, video VideoProvider, fundamental FundamentalProvider, emotion EmotionProvider, mediaDir, mediaToken string, frontend fs.FS) *Server {
 	return &Server{
 		analyzer:      analyzer,
 		resolver:      resolver,
@@ -167,6 +168,7 @@ func New(analyzer Analyzer, resolver Resolver, klineProvider KlineProvider, news
 		minute:        minute,
 		video:         video,
 		fundamental:   fundamental,
+		emotion:       emotion,
 		quota:         NewQuota(20), // 每次打开页面 20 次 API 调用机会
 		mediaDir:      mediaDir,
 		mediaToken:    mediaToken,
@@ -190,6 +192,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/finance/analyze", s.handleFinanceAnalyze) // 财报 AI 解析（SSE，计配额）
 	mux.HandleFunc("GET /api/minute", s.handleMinute)                   // 分时数据（当日）
 	mux.HandleFunc("GET /api/fundamental", s.handleFundamental)         // 基本面评分数据
+	mux.HandleFunc("POST /api/emotion/analyze", s.handleEmotionAnalyze) // 情绪 AI 解读（SSE，计配额）
 	mux.HandleFunc("GET /api/video", s.handleVideo)                     // 视频资讯（B站，按时间/播放量）
 	// 媒体播放（抖音式禁止转载）：token 校验 + 受保护播放页 + 视频流（Range 支持）
 	if s.mediaDir != "" && s.mediaToken != "" {
